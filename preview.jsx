@@ -21,6 +21,14 @@ styleEl.textContent = `
     from { opacity: 0; transform: translateX(-50%) translateY(8px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0);   }
   }
+  @keyframes notifSlideIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-110%); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  @keyframes notifSlideOut {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(-110%); }
+  }
   * { box-sizing: border-box; }
   body { margin: 0; }
 `;
@@ -589,8 +597,245 @@ function NavIcon({ type, active, color }) {
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill={bg}/>
       </svg>
     ),
+    survey: (
+      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2" fill={bg}/>
+        <line x1="8" y1="7" x2="16" y2="7"/>
+        <line x1="8" y1="11" x2="16" y2="11"/>
+        <line x1="8" y1="15" x2="13" y2="15"/>
+        <polyline points="8,7 8,7" strokeLinecap="round"/>
+      </svg>
+    ),
   };
   return <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>{icons[type]}</span>;
+}
+
+
+/* ── アンケートページ ── */
+function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSurvey }) {
+  const [creating, setCreating]   = useState(false);
+  const [form, setForm]           = useState({ title:"", desc:"", options:["",""], allowFree:false });
+  const [answering, setAnswering] = useState(null); // survey id
+  const [selected, setSelected]   = useState(null);
+  const [freeText, setFreeText]   = useState("");
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const addOption    = () => setForm(f => ({ ...f, options:[...f.options, ""] }));
+  const updateOption = (i, v) => setForm(f => { const o=[...f.options]; o[i]=v; return {...f,options:o}; });
+  const removeOption = (i) => setForm(f => ({ ...f, options:f.options.filter((_,idx)=>idx!==i) }));
+
+  const saveNew = () => {
+    if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
+    if (form.options.some(o=>!o.trim())) { alert("選択肢を全て入力してください"); return; }
+    onAddSurvey({ ...form, options: form.options.filter(o=>o.trim()) });
+    setForm({ title:"", desc:"", options:["",""], allowFree:false });
+    setCreating(false);
+  };
+
+  const submitAnswer = (id) => {
+    if (selected === null) { alert("選択肢を選んでください"); return; }
+    onAnswerSurvey(id, selected, freeText);
+    setAnswering(null); setSelected(null); setFreeText("");
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={card}>
+        <div style={{ ...divider, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <h1 style={hdg(17)}><span style={dot} />アンケート</h1>
+          {isAdmin && !creating && (
+            <button onClick={() => setCreating(true)} style={{ ...btnP, ...btnSm }}>＋ 新規作成</button>
+          )}
+        </div>
+
+        {/* 新規作成フォーム */}
+        {isAdmin && creating && (
+          <div style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:12, padding:16, marginBottom:20 }}>
+            <div style={{ fontFamily:FS, fontSize:15, fontWeight:600, color:C.accent, marginBottom:14 }}>新しいアンケートを作成</div>
+            <label style={lbl}>タイトル</label>
+            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+              placeholder="例：文化祭の出し物について" style={{ ...inp, marginBottom:10 }} />
+            <label style={lbl}>説明 <span style={{ fontWeight:400, color:C.inkLight }}>（任意）</span></label>
+            <input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))}
+              placeholder="例：みんなの意見を聞かせてください" style={{ ...inp, marginBottom:14 }} />
+            <label style={lbl}>選択肢</label>
+            {form.options.map((o,i) => (
+              <div key={i} style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
+                <input value={o} onChange={e=>updateOption(i,e.target.value)}
+                  placeholder={`選択肢 ${i+1}`} style={{ ...inp }} />
+                {form.options.length > 2 && (
+                  <button onClick={()=>removeOption(i)}
+                    style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:12, padding:"6px 10px", borderRadius:6, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>削除</button>
+                )}
+              </div>
+            ))}
+            <button onClick={addOption} style={{ ...btnO, ...btnSm, marginBottom:14 }}>＋ 選択肢を追加</button>
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
+              <input type="checkbox" id="allowFree" checked={form.allowFree}
+                onChange={e=>setForm(f=>({...f,allowFree:e.target.checked}))} style={{ width:16, height:16, accentColor:C.accent }} />
+              <label htmlFor="allowFree" style={{ fontFamily:FB, fontSize:13, color:C.inkMid, cursor:"pointer" }}>自由記述欄も追加する</label>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={saveNew} style={{ ...btnP, ...btnSm }}>公開する</button>
+              <button onClick={()=>setCreating(false)} style={{ ...btnO, ...btnSm }}>キャンセル</button>
+            </div>
+          </div>
+        )}
+
+        {surveys.length === 0 && (
+          <div style={{ fontFamily:FB, textAlign:"center", padding:"40px 0", color:C.inkLight, fontSize:13 }}>アンケートはまだありません</div>
+        )}
+
+        {surveys.map(sv => {
+          const total = sv.answers ? sv.answers.reduce((s,a)=>s+a.count,0) : 0;
+          const isAnswering = answering === sv.id;
+          const myAnswer = sv.myAnswer;
+          return (
+            <div key={sv.id} style={{ border:`1px solid ${C.rule}`, borderRadius:12, padding:16, marginBottom:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, marginBottom:8 }}>
+                <div>
+                  <div style={{ fontFamily:FS, fontSize:16, fontWeight:600, color:C.ink }}>{sv.title}</div>
+                  {sv.desc && <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid, marginTop:4 }}>{sv.desc}</div>}
+                </div>
+                <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+                  <span style={{ fontFamily:FB, fontSize:11, color:C.inkLight }}>{total}票</span>
+                  {isAdmin && (
+                    <button onClick={()=>setConfirmDel(sv.id)}
+                      style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 8px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>削除</button>
+                  )}
+                </div>
+              </div>
+
+              {/* 結果バー（管理者のみ） */}
+              {isAdmin && (
+                <div style={{ marginBottom:12 }}>
+                  {sv.options.map((opt, i) => {
+                    const ans = sv.answers ? sv.answers.find(a=>a.index===i) : null;
+                    const cnt = ans ? ans.count : 0;
+                    const pct = total > 0 ? Math.round(cnt/total*100) : 0;
+                    return (
+                      <div key={i} style={{ marginBottom:8 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                          <span style={{ fontFamily:FB, fontSize:13, color:C.ink }}>{opt}</span>
+                          <span style={{ fontFamily:FB, fontSize:12, fontWeight:700, color:C.accent }}>{cnt}票 ({pct}%)</span>
+                        </div>
+                        <div style={{ height:6, background:C.rule, borderRadius:10, overflow:"hidden" }}>
+                          <div style={{ height:"100%", background:C.accent, borderRadius:10, width:`${pct}%`, transition:"width 0.6s ease" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontFamily:FB, fontSize:11, color:C.inkLight, textAlign:"right", marginTop:4 }}>合計 {total}票</div>
+                </div>
+              )}
+              {/* 一般ユーザーには選択肢のリストのみ表示 */}
+              {!isAdmin && (
+                <div style={{ marginBottom:12 }}>
+                  {sv.options.map((opt, i) => (
+                    <div key={i} style={{ fontFamily:FB, fontSize:13, color:C.inkMid, padding:"4px 0", borderBottom:`1px solid ${C.rule}` }}>{opt}</div>
+                  ))}
+                </div>
+              )}
+
+              {/* 回答フォーム */}
+              {!myAnswer && !isAnswering && (
+                <button onClick={()=>{ setAnswering(sv.id); setSelected(null); setFreeText(""); }}
+                  style={{ ...btnP, ...btnSm }}>回答する</button>
+              )}
+              {myAnswer && (
+                <div style={{ fontFamily:FB, fontSize:12, color:C.green, fontWeight:700 }}>✓ 回答済み：{sv.options[myAnswer.index]}</div>
+              )}
+              {isAnswering && (
+                <div style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:10, padding:14, marginTop:8 }}>
+                  <div style={{ fontFamily:FB, fontSize:13, fontWeight:700, color:C.accent, marginBottom:10 }}>選択してください</div>
+                  {sv.options.map((opt, i) => (
+                    <div key={i} onClick={()=>setSelected(i)}
+                      style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, marginBottom:6, cursor:"pointer",
+                        background: selected===i ? C.accent+"18" : C.paper,
+                        border: `1px solid ${selected===i ? C.accent : C.rule}` }}>
+                      <div style={{ width:18, height:18, borderRadius:"50%", border:`2px solid ${selected===i ? C.accent : C.rule}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                        {selected===i && <div style={{ width:8, height:8, borderRadius:"50%", background:C.accent }} />}
+                      </div>
+                      <span style={{ fontFamily:FB, fontSize:13, color:C.ink }}>{opt}</span>
+                    </div>
+                  ))}
+                  {sv.allowFree && (
+                    <div style={{ marginTop:10 }}>
+                      <label style={lbl}>自由記述 <span style={{ fontWeight:400, color:C.inkLight }}>（任意）</span></label>
+                      <textarea value={freeText} onChange={e=>setFreeText(e.target.value)}
+                        rows={2} placeholder="自由にコメントを書いてください"
+                        style={{ ...inp, resize:"none", fontSize:13 }} />
+                    </div>
+                  )}
+                  <div style={{ display:"flex", gap:8, marginTop:12 }}>
+                    <button onClick={()=>submitAnswer(sv.id)} style={{ ...btnP, ...btnSm }}>送信</button>
+                    <button onClick={()=>setAnswering(null)} style={{ ...btnO, ...btnSm }}>キャンセル</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <ConfirmDialog
+        msg={confirmDel ? "このアンケートを削除してもよいですか？" : null}
+        onOk={()=>{ onDeleteSurvey(confirmDel); setConfirmDel(null); }}
+        onCancel={()=>setConfirmDel(null)}
+      />
+    </div>
+  );
+}
+
+/* ── iPhone風通知バナー ── */
+function NotifBanner({ survey, onTap, onDismiss }) {
+  const [visible, setVisible] = useState(true);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    playNotifSound();
+    const t = setTimeout(() => dismiss(), 5000);
+    return () => clearTimeout(t);
+  }, [survey]);
+
+  const dismiss = () => {
+    setLeaving(true);
+    setTimeout(() => { setVisible(false); onDismiss(); }, 350);
+  };
+
+  if (!visible || !survey) return null;
+  return (
+    <div
+      onClick={() => { onTap(); dismiss(); }}
+      style={{
+        position:"fixed", top:70, left:"50%", transform:"translateX(-50%)",
+        zIndex:9000,
+        width:"min(380px, 92vw)",
+        background:"rgba(30,30,40,0.92)",
+        backdropFilter:"blur(16px)",
+        borderRadius:18,
+        padding:"14px 18px",
+        display:"flex", alignItems:"center", gap:14,
+        boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
+        cursor:"pointer",
+        animation:`${leaving ? "notifSlideOut" : "notifSlideIn"} 0.35s cubic-bezier(.32,1.2,.48,1) forwards`,
+      }}
+    >
+      <div style={{ width:40, height:40, borderRadius:10, background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/>
+          <circle cx="6" cy="9" r="1" fill="#fff"/><circle cx="6" cy="13" r="1" fill="#fff"/>
+        </svg>
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.55)", marginBottom:2 }}>みんなの意見箱 · 新しいアンケート</div>
+        <div style={{ fontFamily:FB, fontSize:14, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{survey.title}</div>
+        {survey.desc && <div style={{ fontFamily:FB, fontSize:12, color:"rgba(255,255,255,0.65)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{survey.desc}</div>}
+      </div>
+      <button onClick={e=>{e.stopPropagation();dismiss();}}
+        style={{ background:"none", border:"none", color:"rgba(255,255,255,0.5)", fontSize:18, cursor:"pointer", padding:4, flexShrink:0 }}>×</button>
+    </div>
+  );
 }
 
 /* ── トースト ── */
@@ -604,11 +849,12 @@ function Toast({ msg }) {
 }
 
 /* ── ボトムナビ ── */
-function BottomNav({ page, setPage, onAdminClick, isAdmin, modalOpen }) {
+function BottomNav({ page, setPage, onAdminClick, isAdmin, modalOpen, unreadCount, onClearUnread }) {
   const tabs = [
     { id:"send",     icon:"send",     label:"意見を送る" },
     { id:"opinions", icon:"opinions", label:"みんなの声" },
     { id:"events",   icon:"events",   label:"予定表" },
+    { id:"survey",   icon:"survey",   label:"アンケート" },
   ];
   const btnStyle = (active) => ({
     flex:1, background:"none", border:"none", fontFamily:FB, fontSize:10,
@@ -618,10 +864,13 @@ function BottomNav({ page, setPage, onAdminClick, isAdmin, modalOpen }) {
   return (
     <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:C.paper, borderTop:`1px solid ${C.rule}`, zIndex:300, display:"flex", alignItems:"stretch" }}>
       {tabs.map(t => (
-        <button key={t.id} onClick={() => setPage(t.id)}
-          style={{ ...btnStyle(!modalOpen && page === t.id) }}>
+        <button key={t.id} onClick={() => { setPage(t.id); if(t.id==="survey") onClearUnread(); }}
+          style={{ ...btnStyle(!modalOpen && page === t.id), position:"relative" }}>
           <NavIcon type={t.icon} active={!modalOpen && page === t.id} />
           {t.label}
+          {t.id === "survey" && unreadCount > 0 && (
+            <span style={{ position:"absolute", top:6, right:"calc(50% - 14px)", width:14, height:14, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
+          )}
         </button>
       ))}
       <button onClick={onAdminClick} style={{ ...btnStyle(modalOpen || isAdmin), color: isAdmin ? C.amber : (modalOpen ? C.accent : C.inkLight) }}>
@@ -631,6 +880,34 @@ function BottomNav({ page, setPage, onAdminClick, isAdmin, modalOpen }) {
     </nav>
   );
 }
+
+/* ── 通知音 ── */
+// バナー表示時：iPhoneライクな3音の上昇チャイム
+function playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    const notes = [
+      { freq:1046.5, t:0,    dur:0.18 }, // C6
+      { freq:1318.5, t:0.1,  dur:0.18 }, // E6
+      { freq:1568.0, t:0.2,  dur:0.35 }, // G6
+    ];
+    notes.forEach(({ freq, t, dur }) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now + t);
+      gain.gain.linearRampToValueAtTime(0.18, now + t + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + t + dur);
+      osc.start(now + t);
+      osc.stop(now + t + dur + 0.05);
+    });
+  } catch(e) {}
+}
+
 
 /* ── GAS通信ヘルパー ── */
 async function gasGet(action) {
@@ -655,9 +932,13 @@ export default function App() {
   const [isAdmin, setIsAdmin]     = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [toast, setToast]         = useState("");
+  const [surveys, setSurveys]     = useState([]);
+  const [notifSurvey, setNotifSurvey] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const toastTimer = useRef(null);
   const isMobile = useWidth() < 720;
   let nextEvId = useRef(DEMO_EVENTS_INIT.length + 1);
+  let nextSvId = useRef(1);
 
   // GAS接続時：初回データ取得
   useEffect(() => {
@@ -747,10 +1028,32 @@ export default function App() {
     showToast("予定を削除しました");
   };
 
+  const handleAddSurvey = (sv) => {
+    const id = nextSvId.current++;
+    const newSv = { id, ...sv, answers: sv.options.map((_,i)=>({index:i,count:0})), myAnswer:null, createdAt: Date.now() };
+    setSurveys(prev => [newSv, ...prev]);
+    setNotifSurvey(newSv);
+    setUnreadCount(c => c + 1);
+    showToast("アンケートを公開しました");
+  };
+  const handleAnswerSurvey = (id, optionIndex, freeText) => {
+    setSurveys(prev => prev.map(sv => {
+      if (sv.id !== id) return sv;
+      const answers = sv.answers.map(a => a.index === optionIndex ? { ...a, count: a.count + 1 } : a);
+      return { ...sv, answers, myAnswer: { index: optionIndex, freeText } };
+    }));
+    showToast("回答しました！");
+  };
+  const handleDeleteSurvey = (id) => {
+    setSurveys(prev => prev.filter(sv => sv.id !== id));
+    showToast("アンケートを削除しました");
+  };
+
   const tabs = [
     { id:"send",     label:"意見を送る" },
     { id:"opinions", label:"みんなの声" },
     { id:"events",   label:"予定表" },
+    { id:"survey",   label:"アンケート" },
   ];
 
   return (
@@ -762,6 +1065,17 @@ export default function App() {
           <div onClick={() => setPage("send")} style={{ display:"flex", alignItems:"baseline", gap:10, cursor:"pointer", flexShrink:0 }}>
             <span style={{ fontFamily:FS, fontWeight:600, fontSize:16, letterSpacing:"0.04em", color:C.ink }}>みんなの意見箱</span>
           </div>
+          {isMobile && (
+            <button onClick={() => { setPage("survey"); setUnreadCount(0); }}
+              style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", marginLeft:"auto" }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              {unreadCount > 0 && (
+                <span style={{ position:"absolute", top:2, right:2, width:15, height:15, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
+              )}
+            </button>
+          )}
           {!isMobile && (
             <nav style={{ display:"flex", gap:2 }}>
               {tabs.map(t => (
@@ -774,11 +1088,23 @@ export default function App() {
             </nav>
           )}
           {!isMobile && (
-            <button onClick={() => setModalOpen(true)}
-              style={{ fontFamily:FB, background: isAdmin ? C.amberBg : (modalOpen ? C.accentBg : "none"), border:`1px solid ${isAdmin ? C.amber : (modalOpen ? C.accent : C.rule)}`, fontSize:12, fontWeight:700, color: isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid), padding:"5px 14px", borderRadius:100, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:6 }}>
-              <NavIcon type="admin" active={modalOpen || isAdmin} color={isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid)} />
-              {isAdmin ? "管理中" : "管理者"}
-            </button>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {/* 通知アイコン */}
+              <button onClick={() => { setPage("survey"); setUnreadCount(0); }}
+                style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {unreadCount > 0 && (
+                  <span style={{ position:"absolute", top:2, right:2, width:16, height:16, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:9, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
+                )}
+              </button>
+              <button onClick={() => setModalOpen(true)}
+                style={{ fontFamily:FB, background: isAdmin ? C.amberBg : (modalOpen ? C.accentBg : "none"), border:`1px solid ${isAdmin ? C.amber : (modalOpen ? C.accent : C.rule)}`, fontSize:12, fontWeight:700, color: isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid), padding:"5px 14px", borderRadius:100, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:6 }}>
+                <NavIcon type="admin" active={modalOpen || isAdmin} color={isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid)} />
+                {isAdmin ? "管理中" : "管理者"}
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -788,9 +1114,10 @@ export default function App() {
         {page === "send"     && <SendPage onSubmit={handleSubmit} />}
         {page === "opinions" && <OpinionsPage opinions={opinions} isAdmin={isAdmin} onToggleAdopt={handleToggleAdopt} onSetProgress={handleSetProgress} onSetPct={handleSetPct} onSetReply={handleSetReply} />}
         {page === "events"   && <EventsPage events={events} isAdmin={isAdmin} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
+        {page === "survey"   && <SurveyPage surveys={surveys} isAdmin={isAdmin} onAddSurvey={handleAddSurvey} onAnswerSurvey={handleAnswerSurvey} onDeleteSurvey={handleDeleteSurvey} />}
       </main>
 
-      {isMobile && <BottomNav page={page} setPage={setPage} onAdminClick={() => setModalOpen(true)} isAdmin={isAdmin} modalOpen={modalOpen} />}
+      {isMobile && <BottomNav page={page} setPage={setPage} onAdminClick={() => setModalOpen(true)} isAdmin={isAdmin} modalOpen={modalOpen} unreadCount={unreadCount} onClearUnread={() => setUnreadCount(0)} />}
 
       <AdminModal
         isOpen={modalOpen} isAdmin={isAdmin}
@@ -799,6 +1126,11 @@ export default function App() {
         onGoOpinions={() => setPage("opinions")}
       />
       <Toast msg={toast} />
+      <NotifBanner
+        survey={notifSurvey}
+        onTap={() => { setPage("survey"); setUnreadCount(0); }}
+        onDismiss={() => setNotifSurvey(null)}
+      />
     </div>
   );
 }

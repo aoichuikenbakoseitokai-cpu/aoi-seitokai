@@ -38,7 +38,7 @@ document.head.appendChild(styleEl);
 const ADMIN_PW = "0510";
 
 // ★ GASをデプロイしたら下のURLを書き換えてください ★
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxBHYu4xEKRCBy5E8g77hnrfPHkgLaaDaBfrchV7LGdo5JjA9aR-9psmtv7JncvY3iw/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxiaYKPEdg3bZx-e2PiUuENQ2TDcabOdHlHZSIoXc6J0zudXAk1kdLfd0numCJWM3Yz/exec";
 const USE_GAS = true; // GAS接続時は true に変更
 
 const DEMO_OPINIONS_INIT = [];
@@ -947,7 +947,11 @@ export default function App() {
       .then(([ops, evs, svs]) => {
         setOpinions(Array.isArray(ops) ? ops : []);
         setEvents(Array.isArray(evs) ? evs.sort((a,b) => a.date.localeCompare(b.date)) : []);
-        setSurveys(Array.isArray(svs) ? svs : []);
+        const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers") || "{}");
+        setSurveys((Array.isArray(svs) ? svs : []).map(sv => ({
+          ...sv,
+          myAnswer: savedAnswers[sv.id] || null,
+        })));
       })
       .catch(() => setOpinions(DEMO_OPINIONS_INIT))
       .finally(() => setLoading(false));
@@ -1050,6 +1054,9 @@ export default function App() {
     if (USE_GAS) {
       await gasPost({ action:"answerSurvey", id, optionIndex, freeText: freeText || "" });
       const svs = await gasGet("getSurveys");
+      const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers") || "{}");
+      savedAnswers[id] = { index: optionIndex, freeText: freeText || "" };
+      localStorage.setItem("surveyAnswers", JSON.stringify(savedAnswers));
       setSurveys(prev => {
         const loaded = Array.isArray(svs) ? svs : prev;
         return loaded.map(sv => sv.id === id ? { ...sv, myAnswer: { index: optionIndex, freeText } } : sv);

@@ -943,10 +943,11 @@ export default function App() {
   // GAS接続時：初回データ取得
   useEffect(() => {
     if (!USE_GAS) return;
-    Promise.all([gasGet("getOpinions"), gasGet("getEvents")])
-      .then(([ops, evs]) => {
+    Promise.all([gasGet("getOpinions"), gasGet("getEvents"), gasGet("getSurveys")])
+      .then(([ops, evs, svs]) => {
         setOpinions(Array.isArray(ops) ? ops : []);
         setEvents(Array.isArray(evs) ? evs.sort((a,b) => a.date.localeCompare(b.date)) : []);
+        setSurveys(Array.isArray(svs) ? svs : []);
       })
       .catch(() => setOpinions(DEMO_OPINIONS_INIT))
       .finally(() => setLoading(false));
@@ -1028,24 +1029,48 @@ export default function App() {
     showToast("予定を削除しました");
   };
 
-  const handleAddSurvey = (sv) => {
-    const id = nextSvId.current++;
-    const newSv = { id, ...sv, answers: sv.options.map((_,i)=>({index:i,count:0})), myAnswer:null, createdAt: Date.now() };
-    setSurveys(prev => [newSv, ...prev]);
-    setNotifSurvey(newSv);
-    setUnreadCount(c => c + 1);
+  const handleAddSurvey = async (sv) => {
+    if (USE_GAS) {
+      await gasPost({ action:"addSurvey", ...sv });
+      const svs = await gasGet("getSurveys");
+      const loaded = Array.isArray(svs) ? svs : [];
+      setSurveys(loaded);
+      const newSv = loaded[0];
+      if (newSv) { setNotifSurvey(newSv); setUnreadCount(c => c + 1); }
+    } else {
+      const id = nextSvId.current++;
+      const newSv = { id, ...sv, answers: sv.options.map((_,i)=>({index:i,count:0})), myAnswer:null, createdAt: Date.now() };
+      setSurveys(prev => [newSv, ...prev]);
+      setNotifSurvey(newSv);
+      setUnreadCount(c => c + 1);
+    }
     showToast("アンケートを公開しました");
   };
-  const handleAnswerSurvey = (id, optionIndex, freeText) => {
-    setSurveys(prev => prev.map(sv => {
-      if (sv.id !== id) return sv;
-      const answers = sv.answers.map(a => a.index === optionIndex ? { ...a, count: a.count + 1 } : a);
-      return { ...sv, answers, myAnswer: { index: optionIndex, freeText } };
-    }));
+  const handleAnswerSurvey = async (id, optionIndex, freeText) => {
+    if (USE_GAS) {
+      await gasPost({ action:"answerSurvey", id, optionIndex, freeText: freeText || "" });
+      const svs = await gasGet("getSurveys");
+      setSurveys(prev => {
+        const loaded = Array.isArray(svs) ? svs : prev;
+        return loaded.map(sv => sv.id === id ? { ...sv, myAnswer: { index: optionIndex, freeText } } : sv);
+      });
+    } else {
+      setSurveys(prev => prev.map(sv => {
+        if (sv.id !== id) return sv;
+        const answers = sv.answers.map(a => a.index === optionIndex ? { ...a, count: a.count + 1 } : a);
+        return { ...sv, answers, myAnswer: { index: optionIndex, freeText } };
+      }));
+    }
     showToast("回答しました！");
   };
-  const handleDeleteSurvey = (id) => {
-    setSurveys(prev => prev.filter(sv => sv.id !== id));
+  const handleDeleteSurvey = async (id) => {
+    if (USE_GAS) {
+      await gasPost({ action:"deleteSurvey", id });
+      const svs = await gasGet("getSurveys");
+      setSurveys(Array.isArray(svs) ? svs : []);
+    } else {
+      setSurveys(prev => prev.filter(sv => sv.id !== id));
+    }
     showToast("アンケートを削除しました");
   };
 

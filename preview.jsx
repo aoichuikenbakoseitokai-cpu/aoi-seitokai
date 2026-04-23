@@ -38,7 +38,7 @@ document.head.appendChild(styleEl);
 const ADMIN_PW = "0510";
 
 // ★ GASをデプロイしたら下のURLを書き換えてください ★
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxiaYKPEdg3bZx-e2PiUuENQ2TDcabOdHlHZSIoXc6J0zudXAk1kdLfd0numCJWM3Yz/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxBHYu4xEKRCBy5E8g77hnrfPHkgLaaDaBfrchV7LGdo5JjA9aR-9psmtv7JncvY3iw/exec";
 const USE_GAS = true; // GAS接続時は true に変更
 
 const DEMO_OPINIONS_INIT = [];

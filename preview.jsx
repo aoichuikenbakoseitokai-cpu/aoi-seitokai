@@ -34,27 +34,20 @@ styleEl.textContent = `
 `;
 document.head.appendChild(styleEl);
 
-/* ── データ ── */
-const ADMIN_PW = "0510";
-
-// ★ GASをデプロイしたら下のURLを書き換えてください ★
+/* ── 定数 ── */
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxBHYu4xEKRCBy5E8g77hnrfPHkgLaaDaBfrchV7LGdo5JjA9aR-9psmtv7JncvY3iw/exec";
-const USE_GAS = true; // GAS接続時は true に変更
+const USE_GAS = true;
+const ADMIN_EMAIL = "aoichuikenbakoseitokai@gmail.com";
 
 const DEMO_OPINIONS_INIT = [];
-
-// 進捗ステータスの定義
 const PROGRESS_OPTIONS = ["未着手", "進行中", "完了"];
 const PROGRESS_STYLE = {
   "未着手": { bg:"#f1f5f9", color:"#64748b", border:"#cbd5e1" },
   "進行中": { bg:"#fff7ed", color:"#c2410c", border:"#fed7aa" },
   "完了":   { bg:"#f0faf4", color:"#1a7a4a", border:"#a7dfc0" },
 };
-
 const DEMO_PROGRESS = [];
-
 const DEMO_EVENTS_INIT = [];
-
 const WD = ["日","月","火","水","木","金","土"];
 
 /* ── カラー ── */
@@ -66,20 +59,18 @@ const C = {
   amber:"#b45309", amberBg:"#fffbeb",
   danger:"#be123c", dangerBg:"#fff1f2",
 };
-
 const FB = "'Zen Kaku Gothic New', sans-serif";
 const FS = "'Shippori Mincho', serif";
 
 /* ── 共通スタイル ── */
-const card  = { background:C.paper, border:`1px solid ${C.rule}`, borderRadius:16, padding:24, boxShadow:"0 1px 4px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04)" };
-const hdg   = (sz=17) => ({ fontFamily:FS, fontWeight:600, fontSize:sz, color:C.ink, display:"flex", alignItems:"center", gap:8, margin:0, padding:0 });
-const dot   = { width:6, height:6, borderRadius:"50%", background:C.accent, flexShrink:0, display:"inline-block" };
-const lbl   = { display:"block", fontFamily:FB, fontSize:11, fontWeight:700, letterSpacing:"0.06em", color:C.inkMid, textTransform:"uppercase", marginBottom:6 };
-const inp   = { width:"100%", fontFamily:FB, fontSize:14, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:10, padding:"10px 14px", outline:"none" };
-const btnP  = { fontFamily:FB, background:C.accent, color:"#fff", border:"none", borderRadius:10, padding:"10px 20px", fontSize:14, fontWeight:700, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6 };
-const btnO  = { fontFamily:FB, background:C.paper, border:`1px solid ${C.rule}`, borderRadius:10, padding:"9px 18px", fontSize:14, fontWeight:700, cursor:"pointer", color:C.inkMid, textDecoration:"none", display:"inline-flex", alignItems:"center", gap:6 };
-const btnSm = { padding:"6px 12px", fontSize:12, borderRadius:6 };
-const notice= { fontFamily:FB, fontSize:12, color:C.inkMid, background:C.accentBg, borderLeft:`3px solid ${C.accent}`, borderRadius:"0 6px 6px 0", padding:"10px 14px", marginTop:16, lineHeight:1.6 };
+const card   = { background:C.paper, border:`1px solid ${C.rule}`, borderRadius:16, padding:24, boxShadow:"0 1px 4px rgba(0,0,0,0.06),0 4px 16px rgba(0,0,0,0.04)" };
+const hdg    = (sz=17) => ({ fontFamily:FS, fontWeight:600, fontSize:sz, color:C.ink, display:"flex", alignItems:"center", gap:8, margin:0, padding:0 });
+const dot    = { width:6, height:6, borderRadius:"50%", background:C.accent, flexShrink:0, display:"inline-block" };
+const lbl    = { display:"block", fontFamily:FB, fontSize:11, fontWeight:700, letterSpacing:"0.06em", color:C.inkMid, textTransform:"uppercase", marginBottom:6 };
+const inp    = { width:"100%", fontFamily:FB, fontSize:14, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:10, padding:"10px 14px", outline:"none" };
+const btnP   = { fontFamily:FB, background:C.accent, color:"#fff", border:"none", borderRadius:10, padding:"10px 20px", fontSize:14, fontWeight:700, cursor:"pointer", display:"inline-flex", alignItems:"center", gap:6 };
+const btnO   = { fontFamily:FB, background:C.paper, border:`1px solid ${C.rule}`, borderRadius:10, padding:"9px 18px", fontSize:14, fontWeight:700, cursor:"pointer", color:C.inkMid, textDecoration:"none", display:"inline-flex", alignItems:"center", gap:6 };
+const btnSm  = { padding:"6px 12px", fontSize:12, borderRadius:6 };
 const divider = { marginBottom:18, paddingBottom:12, borderBottom:`1px solid ${C.rule}` };
 
 /* ── useWindowWidth ── */
@@ -91,6 +82,246 @@ function useWidth() {
     return () => window.removeEventListener("resize", h);
   }, []);
   return w;
+}
+
+/* ── GAS通信ヘルパー ── */
+async function gasGet(action) {
+  const res = await fetch(`${GAS_URL}?action=${action}`);
+  return res.json();
+}
+async function gasPost(body) {
+  const res = await fetch(GAS_URL, { method:"POST", body:JSON.stringify(body) });
+  return res.json();
+}
+
+/* ── パスワードハッシュ（簡易） ── */
+async function hashPassword(pw) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+/* ============================================================
+   ログイン・登録画面
+   ============================================================ */
+function AuthPage({ onLogin }) {
+  const [mode, setMode]       = useState("login"); // login | register
+  const [email, setEmail]     = useState("");
+  const [pw, setPw]           = useState("");
+  const [pw2, setPw2]         = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [grade, setGrade]     = useState("");
+  const [classNum, setClassNum] = useState("");
+  const [error, setError]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email.trim() || !pw) { setError("メールアドレスとパスワードを入力してください"); return; }
+    setLoading(true); setError("");
+    try {
+      const hash = await hashPassword(pw);
+      const res = await gasPost({ action:"login", email:email.trim().toLowerCase(), passwordHash:hash });
+      if (res.ok) {
+        localStorage.setItem("authUser", JSON.stringify(res.user));
+        onLogin(res.user);
+      } else {
+        setError(res.error || "ログインに失敗しました");
+      }
+    } catch(e) { setError("通信エラーが発生しました"); }
+    setLoading(false);
+  };
+
+  const handleRegister = async () => {
+    if (!email.trim() || !pw || !displayName.trim()) { setError("必須項目を入力してください"); return; }
+    if (pw !== pw2) { setError("パスワードが一致しません"); return; }
+    if (pw.length < 6) { setError("パスワードは6文字以上にしてください"); return; }
+    setLoading(true); setError("");
+    try {
+      const hash = await hashPassword(pw);
+      const res = await gasPost({
+        action:"register",
+        email: email.trim().toLowerCase(),
+        passwordHash: hash,
+        displayName: displayName.trim(),
+        grade: grade.trim(),
+        classNum: classNum.trim(),
+      });
+      if (res.ok) {
+        localStorage.setItem("authUser", JSON.stringify(res.user));
+        onLogin(res.user);
+      } else {
+        setError(res.error || "登録に失敗しました");
+      }
+    } catch(e) { setError("通信エラーが発生しました"); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.wash, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <div style={{ ...card, width:"100%", maxWidth:400 }}>
+        <div style={{ textAlign:"center", marginBottom:28 }}>
+          <div style={{ fontFamily:FS, fontWeight:600, fontSize:22, color:C.ink, marginBottom:6 }}>みんなの意見箱</div>
+          <div style={{ fontFamily:FB, fontSize:13, color:C.inkLight }}>葵中学校 生徒会</div>
+        </div>
+
+        {/* タブ */}
+        <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1px solid ${C.rule}`, marginBottom:24 }}>
+          {["login","register"].map(m => (
+            <button key={m} onClick={() => { setMode(m); setError(""); }}
+              style={{ flex:1, fontFamily:FB, fontSize:13, fontWeight:700, padding:"10px 0", border:"none", cursor:"pointer",
+                background: mode===m ? C.accent : C.paper, color: mode===m ? "#fff" : C.inkMid, transition:"all .15s" }}>
+              {m === "login" ? "ログイン" : "新規登録"}
+            </button>
+          ))}
+        </div>
+
+        {mode === "login" ? (
+          <>
+            <div style={{ marginBottom:14 }}>
+              <label style={lbl}>メールアドレス</label>
+              <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="example@gmail.com" />
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={lbl}>パスワード</label>
+              <input style={inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} placeholder="パスワードを入力" />
+            </div>
+            {error && <div style={{ fontFamily:FB, fontSize:12, color:C.danger, marginBottom:14 }}>{error}</div>}
+            <button style={{ ...btnP, width:"100%", justifyContent:"center" }} onClick={handleLogin} disabled={loading}>
+              {loading ? "ログイン中..." : "ログイン"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontFamily:FB, fontSize:12, color:C.accent, background:C.accentBg, borderRadius:8, padding:"10px 14px", marginBottom:18, lineHeight:1.6 }}>
+              💡 意見は必ず<strong>匿名</strong>で他の生徒に表示されます。名前が公開されることはありません。
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={lbl}>メールアドレス <span style={{ color:C.danger }}>*</span></label>
+              <input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="example@gmail.com" />
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={lbl}>表示名（ニックネームでも可）<span style={{ color:C.danger }}>*</span></label>
+              <input style={inp} value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="例：田中太郎" maxLength={20} />
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+              <div>
+                <label style={lbl}>学年 <span style={{ fontWeight:400, color:C.inkLight }}>(任意)</span></label>
+                <input style={inp} value={grade} onChange={e=>setGrade(e.target.value)} placeholder="例：2" maxLength={1} />
+              </div>
+              <div>
+                <label style={lbl}>クラス <span style={{ fontWeight:400, color:C.inkLight }}>(任意)</span></label>
+                <input style={inp} value={classNum} onChange={e=>setClassNum(e.target.value)} placeholder="例：3" maxLength={1} />
+              </div>
+            </div>
+            <div style={{ marginBottom:12 }}>
+              <label style={lbl}>パスワード <span style={{ color:C.danger }}>*</span></label>
+              <input style={inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="6文字以上" />
+            </div>
+            <div style={{ marginBottom:20 }}>
+              <label style={lbl}>パスワード（確認）<span style={{ color:C.danger }}>*</span></label>
+              <input style={inp} type="password" value={pw2} onChange={e=>setPw2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleRegister()} placeholder="もう一度入力" />
+            </div>
+            {error && <div style={{ fontFamily:FB, fontSize:12, color:C.danger, marginBottom:14 }}>{error}</div>}
+            <button style={{ ...btnP, width:"100%", justifyContent:"center" }} onClick={handleRegister} disabled={loading}>
+              {loading ? "登録中..." : "アカウントを作成"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   設定ページ
+   ============================================================ */
+function SettingsPage({ user, onUpdateUser, onLogout }) {
+  const [displayName, setDisplayName] = useState(user.displayName || "");
+  const [grade, setGrade]     = useState(user.grade || "");
+  const [classNum, setClassNum] = useState(user.classNum || "");
+  const [pw, setPw]           = useState("");
+  const [pw2, setPw2]         = useState("");
+  const [error, setError]     = useState("");
+  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    if (!displayName.trim()) { setError("表示名を入力してください"); return; }
+    if (pw && pw.length < 6) { setError("パスワードは6文字以上にしてください"); return; }
+    if (pw && pw !== pw2) { setError("パスワードが一致しません"); return; }
+    setLoading(true); setError(""); setSuccess("");
+    try {
+      const body = {
+        action: "updateProfile",
+        email: user.email,
+        displayName: displayName.trim(),
+        grade: grade.trim(),
+        classNum: classNum.trim(),
+      };
+      if (pw) body.passwordHash = await hashPassword(pw);
+      const res = await gasPost(body);
+      if (res.ok) {
+        const updated = { ...user, displayName:displayName.trim(), grade:grade.trim(), classNum:classNum.trim() };
+        localStorage.setItem("authUser", JSON.stringify(updated));
+        onUpdateUser(updated);
+        setSuccess("プロフィールを更新しました");
+        setPw(""); setPw2("");
+      } else {
+        setError(res.error || "更新に失敗しました");
+      }
+    } catch(e) { setError("通信エラーが発生しました"); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+      <div style={card}>
+        <div style={divider}><h1 style={hdg(17)}><span style={dot} />プロフィール設定</h1></div>
+
+        <div style={{ fontFamily:FB, fontSize:12, color:C.accent, background:C.accentBg, borderRadius:8, padding:"10px 14px", marginBottom:20, lineHeight:1.6 }}>
+          💡 意見は必ず<strong>匿名</strong>で他の生徒に表示されます。名前が公開されることはありません。
+        </div>
+
+        <div style={{ marginBottom:14 }}>
+          <label style={lbl}>メールアドレス</label>
+          <div style={{ ...inp, background:"#f1f5f9", color:C.inkMid, cursor:"not-allowed" }}>{user.email}</div>
+        </div>
+        <div style={{ marginBottom:14 }}>
+          <label style={lbl}>表示名 <span style={{ color:C.danger }}>*</span></label>
+          <input style={inp} value={displayName} onChange={e=>setDisplayName(e.target.value)} maxLength={20} />
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+          <div>
+            <label style={lbl}>学年 <span style={{ fontWeight:400, color:C.inkLight }}>(任意)</span></label>
+            <input style={inp} value={grade} onChange={e=>setGrade(e.target.value)} placeholder="例：2" maxLength={1} />
+          </div>
+          <div>
+            <label style={lbl}>クラス <span style={{ fontWeight:400, color:C.inkLight }}>(任意)</span></label>
+            <input style={inp} value={classNum} onChange={e=>setClassNum(e.target.value)} placeholder="例：3" maxLength={1} />
+          </div>
+        </div>
+        <div style={{ marginBottom:14 }}>
+          <label style={lbl}>新しいパスワード <span style={{ fontWeight:400, color:C.inkLight }}>(変更する場合のみ)</span></label>
+          <input style={inp} type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="6文字以上" />
+        </div>
+        <div style={{ marginBottom:20 }}>
+          <label style={lbl}>新しいパスワード（確認）</label>
+          <input style={inp} type="password" value={pw2} onChange={e=>setPw2(e.target.value)} placeholder="もう一度入力" />
+        </div>
+        {error   && <div style={{ fontFamily:FB, fontSize:12, color:C.danger,  marginBottom:14 }}>{error}</div>}
+        {success && <div style={{ fontFamily:FB, fontSize:12, color:C.green,   marginBottom:14 }}>{success}</div>}
+        <button style={{ ...btnP, ...btnSm }} onClick={handleSave} disabled={loading}>
+          {loading ? "保存中..." : "保存する"}
+        </button>
+      </div>
+
+      <div style={card}>
+        <div style={divider}><h2 style={hdg(15)}><span style={dot} />アカウント</h2></div>
+        <button style={{ ...btnO, ...btnSm, color:C.danger, borderColor:"#f9a8c0" }} onClick={onLogout}>
+          ログアウト
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /* ── 進捗 ── */
@@ -131,11 +362,10 @@ function SendPage({ onSubmit }) {
   return (
     <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 280px", gap:20, alignItems:"start" }}>
       <div style={card}>
-        <div style={divider}>
-          <h1 style={hdg(17)}><span style={dot} />意見を送る</h1>
-        </div>
+        <div style={divider}><h1 style={hdg(17)}><span style={dot} />意見を送る</h1></div>
         <p style={{ fontFamily:FB, fontSize:13, color:C.inkMid, marginBottom:20, lineHeight:1.7 }}>
-          かなえてほしいこと、改善してほしいこと、困っていること — なんでも書いてください。
+          かなえてほしいこと、改善してほしいこと、困っていること — なんでも書いてください。<br/>
+          <strong style={{ color:C.accent }}>意見は匿名で表示されます。</strong>
         </p>
         <div style={{ marginBottom:18 }}>
           <label style={lbl}>タイトル <span style={{ textTransform:"none", fontWeight:400, color:C.inkLight }}>（任意）</span></label>
@@ -191,20 +421,16 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
   const [replyImageData, setReplyImageData] = useState(null);
   const isMobile = useWidth() < 720;
 
-  const openReply = (item) => {
-    setReplyingRow(item.row);
-    setReplyText(item.reply || "");
-    setReplyImageData(item.replyImage || null);
-  };
+  const openReply  = (item) => { setReplyingRow(item.row); setReplyText(item.reply || ""); setReplyImageData(item.replyImage || null); };
   const closeReply = () => { setReplyingRow(null); setReplyText(""); setReplyImageData(null); };
   const saveReply  = (row) => { onSetReply(row, replyText, replyImageData); closeReply(); };
   const handleImagePick = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => setReplyImageData(ev.target.result);
     reader.readAsDataURL(file);
   };
+
   const sorted = [...opinions].sort((a,b) => {
     const diff = new Date(a.timestamp) - new Date(b.timestamp);
     return sortOrder === "asc" ? diff : -diff;
@@ -224,14 +450,12 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
             <h1 style={hdg(17)}><span style={dot} />みんなの声</h1>
             <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
               <div style={{ display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${C.rule}` }}>
-                <button onClick={() => setSortOrder("desc")}
-                  style={{ fontFamily:FB, fontSize:12, fontWeight:700, padding:"6px 12px", border:"none", cursor:"pointer", background: sortOrder==="desc" ? C.accent : C.paper, color: sortOrder==="desc" ? "#fff" : C.inkMid, transition:"all .15s" }}>
-                  新しい順
-                </button>
-                <button onClick={() => setSortOrder("asc")}
-                  style={{ fontFamily:FB, fontSize:12, fontWeight:700, padding:"6px 12px", border:"none", cursor:"pointer", background: sortOrder==="asc" ? C.accent : C.paper, color: sortOrder==="asc" ? "#fff" : C.inkMid, transition:"all .15s" }}>
-                  古い順
-                </button>
+                {["desc","asc"].map(o => (
+                  <button key={o} onClick={() => setSortOrder(o)}
+                    style={{ fontFamily:FB, fontSize:12, fontWeight:700, padding:"6px 12px", border:"none", cursor:"pointer", background: sortOrder===o ? C.accent : C.paper, color: sortOrder===o ? "#fff" : C.inkMid, transition:"all .15s" }}>
+                    {o==="desc" ? "新しい順" : "古い順"}
+                  </button>
+                ))}
               </div>
               <select style={{ ...inp, width:"auto", minWidth:130, fontSize:13 }} value={filter} onChange={e => setFilter(e.target.value)}>
                 <option value="all">すべて表示</option>
@@ -245,7 +469,7 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
           </div>
           {isAdmin && (
             <div style={{ fontFamily:FB, background:C.amberBg, border:`1px solid #fcd34d`, borderRadius:10, padding:"10px 14px", fontSize:13, color:C.amber, fontWeight:700, marginBottom:16 }}>
-              管理モード ON — 各投稿の採用状態を変更できます
+              管理モード ON — 投稿者の名前が表示されています
             </div>
           )}
           <div style={{ maxHeight:520, overflowY:"auto" }}>
@@ -257,7 +481,13 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
                 <div key={item.row} style={{ padding:14, border:`1px solid ${C.rule}`, borderRadius:10, marginBottom:10 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10, marginBottom:8 }}>
                     <div>
-                      <div style={{ fontFamily:FB, fontSize:13, fontWeight:700 }}>{item.name}</div>
+                      {/* 管理者には本名・一般には匿名表示 */}
+                      <div style={{ fontFamily:FB, fontSize:13, fontWeight:700 }}>
+                        {isAdmin && item.authorName ? `${item.authorName}（${item.name}）` : item.name}
+                      </div>
+                      {isAdmin && item.authorInfo && (
+                        <div style={{ fontFamily:FB, fontSize:11, color:C.accent, marginTop:1 }}>{item.authorInfo}</div>
+                      )}
                       <div style={{ fontFamily:FB, fontSize:11, color:C.inkLight, marginTop:2 }}>{item.timestamp}</div>
                     </div>
                     <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
@@ -281,20 +511,13 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
                     </div>
                     {isAdmin ? (
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:6, flexShrink:0 }}>
-                          <select
-                            value={item.progress || "未着手"}
-                            onChange={e => onSetProgress(item.row, e.target.value)}
-                            style={{ fontFamily:FB, fontSize:12, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:6, padding:"4px 8px", outline:"none", cursor:"pointer" }}>
-                            {PROGRESS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                          </select>
-                        </div>
-                        <input
-                          type="range" min={0} max={100} step={1}
-                          value={item.pct ?? 0}
+                        <select value={item.progress || "未着手"} onChange={e => onSetProgress(item.row, e.target.value)}
+                          style={{ fontFamily:FB, fontSize:12, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:6, padding:"4px 8px", outline:"none", cursor:"pointer" }}>
+                          {PROGRESS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <input type="range" min={0} max={100} step={1} value={item.pct ?? 0}
                           onChange={e => onSetPct(item.row, Number(e.target.value))}
-                          style={{ flex:1, accentColor:C.accent, cursor:"pointer", height:4 }}
-                        />
+                          style={{ flex:1, accentColor:C.accent, cursor:"pointer", height:4 }} />
                       </div>
                     ) : (
                       <div style={{ height:6, background:C.rule, borderRadius:10, overflow:"hidden" }}>
@@ -303,49 +526,35 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
                     )}
                   </div>
 
-                  {/* 生徒会からの返信（一般ユーザーにも表示） */}
+                  {/* 返信表示 */}
                   {item.reply && replyingRow !== item.row && (
-                    <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.rule}`, background:C.accentBg, borderRadius:8, padding:"10px 12px", marginTop:10 }}>
+                    <div style={{ background:C.accentBg, borderRadius:8, padding:"10px 12px", marginTop:10 }}>
                       <div style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.accent, marginBottom:6 }}>生徒会より</div>
                       <div style={{ fontFamily:FB, fontSize:13, lineHeight:1.75, color:C.ink }}>{item.reply}</div>
-                      {item.replyImage && (
-                        <img src={item.replyImage} alt="返信画像" style={{ marginTop:10, maxWidth:"100%", maxHeight:240, borderRadius:8, objectFit:"contain", display:"block" }} />
-                      )}
+                      {item.replyImage && <img src={item.replyImage} alt="返信画像" style={{ marginTop:10, maxWidth:"100%", maxHeight:240, borderRadius:8, objectFit:"contain", display:"block" }} />}
                     </div>
                   )}
 
-                  {/* 管理者：返信編集フォーム */}
+                  {/* 管理者返信フォーム */}
                   {isAdmin && replyingRow === item.row && (
-                    <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.rule}`, background:C.accentBg, borderRadius:8, padding:"12px" }}>
-                      <div style={{ fontFamily:FB, fontSize:12, fontWeight:700, color:C.accent, marginBottom:8 }}>生徒会からの返信を編集</div>
-                      <textarea
-                        value={replyText}
-                        onChange={e => setReplyText(e.target.value)}
-                        placeholder="返信メッセージを入力してください"
-                        rows={3}
-                        style={{ ...inp, resize:"none", fontSize:13, marginBottom:8, display:"block" }}
-                      />
-                      {/* 画像添付 */}
+                    <div style={{ background:C.accentBg, borderRadius:8, padding:"12px", marginTop:10 }}>
+                      <div style={{ fontFamily:FB, fontSize:12, fontWeight:700, color:C.accent, marginBottom:8 }}>返信を編集</div>
+                      <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder="返信メッセージ" rows={3}
+                        style={{ ...inp, resize:"none", fontSize:13, marginBottom:8, display:"block" }} />
                       <div style={{ marginBottom:10 }}>
                         <label style={{ ...lbl, display:"block", marginBottom:4 }}>画像を添付 <span style={{ fontWeight:400, color:C.inkLight }}>（任意）</span></label>
-                        <input type="file" accept="image/*" onChange={handleImagePick}
-                          style={{ fontFamily:FB, fontSize:12, color:C.inkMid }} />
-                        {replyImageData && (
-                          <div style={{ marginTop:8 }}>
-                            <img src={replyImageData} alt="プレビュー" style={{ maxWidth:"100%", maxHeight:180, borderRadius:8, objectFit:"contain", display:"block" }} />
-                          </div>
-                        )}
+                        <input type="file" accept="image/*" onChange={handleImagePick} style={{ fontFamily:FB, fontSize:12, color:C.inkMid }} />
+                        {replyImageData && <img src={replyImageData} alt="プレビュー" style={{ marginTop:8, maxWidth:"100%", maxHeight:180, borderRadius:8, objectFit:"contain", display:"block" }} />}
                       </div>
                       <div style={{ display:"flex", gap:8 }}>
                         <button onClick={() => saveReply(item.row)} style={{ ...btnP, ...btnSm }}>保存</button>
                         <button onClick={closeReply} style={{ ...btnO, ...btnSm }}>キャンセル</button>
-
                       </div>
                     </div>
                   )}
 
                   {isAdmin && (
-                    <div style={{ marginTop:10, display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+                    <div style={{ marginTop:10, display:"flex", gap:8, flexWrap:"wrap" }}>
                       <button onClick={() => askConfirm(item.row, !adopted)}
                         style={{ fontFamily:FB, background: adopted ? C.dangerBg : C.greenBg, border:`1px solid ${adopted ? "#f9a8c0" : "#a7dfc0"}`, color: adopted ? C.danger : C.green, fontSize:12, padding:"5px 12px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>
                         {adopted ? "採用を取り消す" : "採用する"}
@@ -379,28 +588,23 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
 function EventEditForm({ form, setForm, onSave, onCancel, isNew }) {
   return (
     <div style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:10, padding:14, margin:"8px 0 4px" }}>
-      <div style={{ fontFamily:FS, fontWeight:600, fontSize:13, color:C.accent, marginBottom:12 }}>
-        {isNew ? "新しい予定を追加" : "予定を編集"}
-      </div>
+      <div style={{ fontFamily:FS, fontWeight:600, fontSize:13, color:C.accent, marginBottom:12 }}>{isNew ? "新しい予定を追加" : "予定を編集"}</div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8, marginBottom:8 }}>
         <div>
           <label style={{ ...lbl, fontSize:10 }}>日付</label>
-          <input type="date" value={form.date} onChange={e => setForm(f=>({...f, date:e.target.value}))}
-            style={{ ...inp, fontSize:12, padding:"7px 10px" }} />
+          <input type="date" value={form.date} onChange={e => setForm(f=>({...f, date:e.target.value}))} style={{ ...inp, fontSize:12, padding:"7px 10px" }} />
         </div>
         <div>
           <label style={{ ...lbl, fontSize:10 }}>タイトル</label>
-          <input value={form.title} onChange={e => setForm(f=>({...f, title:e.target.value}))}
-            placeholder="例：生徒総会" style={{ ...inp, fontSize:12, padding:"7px 10px" }} maxLength={40} />
+          <input value={form.title} onChange={e => setForm(f=>({...f, title:e.target.value}))} placeholder="例：生徒総会" style={{ ...inp, fontSize:12, padding:"7px 10px" }} maxLength={40} />
         </div>
       </div>
       <div style={{ marginBottom:10 }}>
         <label style={{ ...lbl, fontSize:10 }}>説明 <span style={{ textTransform:"none", fontWeight:400, color:C.inkLight }}>（任意）</span></label>
-        <input value={form.desc} onChange={e => setForm(f=>({...f, desc:e.target.value}))}
-          placeholder="例：放課後 第2会議室" style={{ ...inp, fontSize:12, padding:"7px 10px" }} maxLength={80} />
+        <input value={form.desc} onChange={e => setForm(f=>({...f, desc:e.target.value}))} placeholder="例：放課後 第2会議室" style={{ ...inp, fontSize:12, padding:"7px 10px" }} maxLength={80} />
       </div>
       <div style={{ display:"flex", gap:8 }}>
-        <button onClick={onSave}   style={{ ...btnP, ...btnSm }}>保存</button>
+        <button onClick={onSave} style={{ ...btnP, ...btnSm }}>保存</button>
         <button onClick={onCancel} style={{ ...btnO, ...btnSm }}>キャンセル</button>
       </div>
     </div>
@@ -409,23 +613,20 @@ function EventEditForm({ form, setForm, onSave, onCancel, isNew }) {
 
 /* ── 予定表ページ ── */
 function EventsPage({ events, isAdmin, onAddEvent, onEditEvent, onDeleteEvent }) {
-  const [editingId, setEditingId] = useState(null); // idまたは"new"
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm]           = useState({ date:"", title:"", desc:"" });
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, title }
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
-  const openNew    = () => { setForm({ date:"", title:"", desc:"" }); setEditingId("new"); };
-  const openEdit   = (ev) => { setForm({ date:ev.date, title:ev.title, desc:ev.desc }); setEditingId(ev.id); };
-  const closeForm  = () => setEditingId(null);
-
-  const saveForm = () => {
+  const openNew   = () => { setForm({ date:"", title:"", desc:"" }); setEditingId("new"); };
+  const openEdit  = (ev) => { setForm({ date:ev.date, title:ev.title, desc:ev.desc }); setEditingId(ev.id); };
+  const closeForm = () => setEditingId(null);
+  const saveForm  = () => {
     if (!form.date || !form.title.trim()) { alert("日付とタイトルは必須です"); return; }
-    if (editingId === "new") onAddEvent(form);
-    else onEditEvent(editingId, form);
+    if (editingId === "new") onAddEvent(form); else onEditEvent(editingId, form);
     closeForm();
   };
-
-  const askDelete  = (ev) => setDeleteConfirm({ id:ev.id, title:ev.title });
-  const doDelete   = () => { onDeleteEvent(deleteConfirm.id); setDeleteConfirm(null); };
+  const askDelete = (ev) => setDeleteConfirm({ id:ev.id, title:ev.title });
+  const doDelete  = () => { onDeleteEvent(deleteConfirm.id); setDeleteConfirm(null); };
 
   const groups = {};
   events.forEach(ev => {
@@ -438,31 +639,19 @@ function EventsPage({ events, isAdmin, onAddEvent, onEditEvent, onDeleteEvent })
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-
-      {/* 年間行事予定（上） */}
       <div style={card}>
         <div style={divider}><h2 style={hdg(17)}><span style={dot} />葵中学校 年間行事予定</h2></div>
         <p style={{ fontFamily:FB, fontSize:13, color:C.inkMid, marginBottom:16, lineHeight:1.7 }}>葵中学校 年間行事予定</p>
-        <a href="https://cms.oklab.ed.jp/jh/aoi/index.cfm/1,2863,c,html/2863/20260220-134641.pdf"
-          target="_blank" rel="noopener noreferrer" style={btnO}>
+        <a href="https://cms.oklab.ed.jp/jh/aoi/index.cfm/1,2863,c,html/2863/20260220-134641.pdf" target="_blank" rel="noopener noreferrer" style={btnO}>
           📄 年間行事予定を開く
         </a>
       </div>
-
-      {/* 生徒会活動・行事予定 */}
       <div style={card}>
         <div style={{ ...divider, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
           <h1 style={hdg(17)}><span style={dot} />生徒会活動・行事予定</h1>
-          {isAdmin && editingId !== "new" && (
-            <button onClick={openNew} style={{ ...btnP, ...btnSm, gap:4 }}>＋ 追加</button>
-          )}
+          {isAdmin && editingId !== "new" && <button onClick={openNew} style={{ ...btnP, ...btnSm, gap:4 }}>＋ 追加</button>}
         </div>
-
-        {/* 新規追加フォーム（一覧の上） */}
-        {editingId === "new" && (
-          <EventEditForm form={form} setForm={setForm} onSave={saveForm} onCancel={closeForm} isNew={true} />
-        )}
-
+        {editingId === "new" && <EventEditForm form={form} setForm={setForm} onSave={saveForm} onCancel={closeForm} isNew={true} />}
         {Object.keys(groups).sort().map(key => {
           const g = groups[key];
           return (
@@ -470,9 +659,8 @@ function EventsPage({ events, isAdmin, onAddEvent, onEditEvent, onDeleteEvent })
               <div style={{ fontFamily:FS, fontSize:13, fontWeight:600, color:C.inkLight, letterSpacing:"0.08em", marginBottom:10, paddingBottom:6, borderBottom:`1px solid ${C.rule}` }}>{g.label}</div>
               {g.items.map((item, i) => (
                 <div key={item.id}>
-                  {/* 予定行 */}
-                  <div style={{ display:"flex", gap:14, alignItems:"flex-start", padding:"13px 0", borderBottom: editingId === item.id ? "none" : (i < g.items.length-1 ? `1px solid ${C.rule}` : "none") }}>
-                    <div style={{ minWidth:52, textAlign:"center", background: editingId===item.id ? C.accentBg : C.accentBg, borderRadius:6, padding:"6px 8px 5px", flexShrink:0 }}>
+                  <div style={{ display:"flex", gap:14, alignItems:"flex-start", padding:"13px 0", borderBottom: editingId===item.id ? "none" : (i<g.items.length-1 ? `1px solid ${C.rule}` : "none") }}>
+                    <div style={{ minWidth:52, textAlign:"center", background:C.accentBg, borderRadius:6, padding:"6px 8px 5px", flexShrink:0 }}>
                       <div style={{ fontFamily:FB, fontSize:10, color:C.accent, fontWeight:700 }}>{item.dt.getMonth()+1}月</div>
                       <div style={{ fontFamily:FS, fontSize:22, fontWeight:600, color:C.accent, lineHeight:1.1 }}>{item.dt.getDate()}</div>
                       <div style={{ fontFamily:FB, fontSize:10, color:C.accent, opacity:0.7 }}>（{WD[item.dt.getDay()]}）</div>
@@ -482,21 +670,14 @@ function EventsPage({ events, isAdmin, onAddEvent, onEditEvent, onDeleteEvent })
                       {item.desc && <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid, marginTop:4, lineHeight:1.6 }}>{item.desc}</div>}
                       {isAdmin && editingId !== item.id && (
                         <div style={{ display:"flex", gap:8, marginTop:8 }}>
-                          <button onClick={() => openEdit(item)}
-                            style={{ fontFamily:FB, background:C.accentBg, border:`1px solid ${C.accent}`, color:C.accent, fontSize:11, padding:"3px 10px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>
-                            編集
-                          </button>
-                          <button onClick={() => askDelete(item)}
-                            style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 10px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>
-                            削除
-                          </button>
+                          <button onClick={() => openEdit(item)} style={{ fontFamily:FB, background:C.accentBg, border:`1px solid ${C.accent}`, color:C.accent, fontSize:11, padding:"3px 10px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>編集</button>
+                          <button onClick={() => askDelete(item)} style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 10px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>削除</button>
                         </div>
                       )}
                     </div>
                   </div>
-                  {/* インライン編集フォーム（該当予定の直下） */}
                   {isAdmin && editingId === item.id && (
-                    <div style={{ borderBottom: i < g.items.length-1 ? `1px solid ${C.rule}` : "none", paddingBottom:8 }}>
+                    <div style={{ borderBottom: i<g.items.length-1 ? `1px solid ${C.rule}` : "none", paddingBottom:8 }}>
                       <EventEditForm form={form} setForm={setForm} onSave={saveForm} onCancel={closeForm} isNew={false} />
                     </div>
                   )}
@@ -505,119 +686,20 @@ function EventsPage({ events, isAdmin, onAddEvent, onEditEvent, onDeleteEvent })
             </div>
           );
         })}
-        {events.length === 0 && (
-          <div style={{ fontFamily:FB, textAlign:"center", padding:"32px 0", color:C.inkLight, fontSize:13 }}>予定がありません</div>
-        )}
+        {events.length === 0 && <div style={{ fontFamily:FB, textAlign:"center", padding:"32px 0", color:C.inkLight, fontSize:13 }}>予定がありません</div>}
       </div>
-
-      {/* 削除確認ダイアログ */}
-      <ConfirmDialog
-        msg={deleteConfirm ? `「${deleteConfirm.title}」を削除してもよいですか？この操作は取り消せません。` : null}
-        onOk={doDelete}
-        onCancel={() => setDeleteConfirm(null)}
-      />
+      <ConfirmDialog msg={deleteConfirm ? `「${deleteConfirm.title}」を削除してもよいですか？` : null} onOk={doDelete} onCancel={() => setDeleteConfirm(null)} />
     </div>
   );
 }
-
-/* ── 管理モーダル（アニメーション付き） ── */
-function AdminModal({ isOpen, isAdmin, onClose, onLogin, onLogout, onGoOpinions }) {
-  const [pw, setPw] = useState("");
-  if (!isOpen) return null;
-
-  const handleLogin = () => { onLogin(pw); setPw(""); };
-
-  return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", zIndex:500, display:"flex", alignItems:"center", justifyContent:"center", padding:20, backdropFilter:"blur(2px)", animation:"overlayIn 0.2s ease" }}>
-      <div style={{ background:C.paper, borderRadius:16, padding:28, width:"100%", maxWidth:400, boxShadow:"0 24px 48px rgba(0,0,0,0.15)", animation:"modalIn 0.22s ease" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
-          <span style={{ fontFamily:FS, fontWeight:600, fontSize:16 }}>管理者ログイン</span>
-          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:C.inkLight, lineHeight:1, padding:4 }}>✕</button>
-        </div>
-        {!isAdmin ? (
-          <>
-            <div style={{ marginBottom:16 }}>
-              <label style={lbl}>管理パスワード</label>
-              <input style={inp} type="password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="パスワードを入力（デモ: 0510）" />
-            </div>
-            <div style={{ display:"flex", gap:8 }}>
-              <button style={{ ...btnP, ...btnSm }} onClick={handleLogin}>ログイン</button>
-              <button style={{ ...btnO, ...btnSm }} onClick={onClose}>キャンセル</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontFamily:FB, background:C.amberBg, border:`1px solid #fcd34d`, borderRadius:10, padding:"12px 16px", fontSize:13, color:C.amber, fontWeight:700, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              管理モード ON — 採用操作が有効です
-              <button onClick={onLogout} style={{ fontWeight:700, textDecoration:"underline", cursor:"pointer", background:"none", border:"none", color:"inherit", fontSize:"inherit", fontFamily:FB }}>ログアウト</button>
-            </div>
-            <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid, marginTop:14, lineHeight:1.7 }}>「みんなの声」ページで各投稿の採用状態を変更できます。</div>
-            <div style={{ marginTop:14 }}>
-              <button style={{ ...btnO, ...btnSm }} onClick={() => { onClose(); onGoOpinions(); }}>意見一覧を見る</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ── ナビアイコン (SVG) ── */
-function NavIcon({ type, active, color }) {
-  const col = color || (active ? C.accent : C.inkLight);
-  const bg  = active ? col + "28" : "none";
-  const sz  = 24;
-  const icons = {
-    send: (
-      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="22 2 15 22 11 13 2 9 22 2" fill={bg}/>
-        <line x1="22" y1="2" x2="11" y2="13"/>
-        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-      </svg>
-    ),
-    opinions: (
-      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3l2 3 2-3h9a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"
-          stroke={col} strokeWidth="1.6" fill={bg}/>
-        <line x1="7" y1="8" x2="17" y2="8" stroke={col} strokeWidth="1.4"/>
-        <line x1="7" y1="12" x2="13" y2="12" stroke={col} strokeWidth="1.4"/>
-      </svg>
-    ),
-    events: (
-      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill={bg}/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
-      </svg>
-    ),
-    admin: (
-      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill={bg}/>
-      </svg>
-    ),
-    survey: (
-      <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="4" y="2" width="16" height="20" rx="2" fill={bg}/>
-        <line x1="8" y1="7" x2="16" y2="7"/>
-        <line x1="8" y1="11" x2="16" y2="11"/>
-        <line x1="8" y1="15" x2="13" y2="15"/>
-        <polyline points="8,7 8,7" strokeLinecap="round"/>
-      </svg>
-    ),
-  };
-  return <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>{icons[type]}</span>;
-}
-
 
 /* ── アンケートページ ── */
 function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSurvey }) {
-  const [creating, setCreating]   = useState(false);
-  const [form, setForm]           = useState({ title:"", desc:"", options:["",""], allowFree:false });
-  const [answering, setAnswering] = useState(null); // survey id
-  const [selected, setSelected]   = useState(null);
-  const [freeText, setFreeText]   = useState("");
+  const [creating, setCreating]     = useState(false);
+  const [form, setForm]             = useState({ title:"", desc:"", options:["",""], allowFree:false });
+  const [answering, setAnswering]   = useState(null);
+  const [selected, setSelected]     = useState(null);
+  const [freeText, setFreeText]     = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
 
   const addOption    = () => setForm(f => ({ ...f, options:[...f.options, ""] }));
@@ -627,7 +709,7 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
   const saveNew = () => {
     if (!form.title.trim()) { alert("タイトルを入力してください"); return; }
     if (form.options.some(o=>!o.trim())) { alert("選択肢を全て入力してください"); return; }
-    onAddSurvey({ ...form, options: form.options.filter(o=>o.trim()) });
+    onAddSurvey({ ...form, options:form.options.filter(o=>o.trim()) });
     setForm({ title:"", desc:"", options:["",""], allowFree:false });
     setCreating(false);
   };
@@ -643,36 +725,27 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
       <div style={card}>
         <div style={{ ...divider, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <h1 style={hdg(17)}><span style={dot} />アンケート</h1>
-          {isAdmin && !creating && (
-            <button onClick={() => setCreating(true)} style={{ ...btnP, ...btnSm }}>＋ 新規作成</button>
-          )}
+          {isAdmin && !creating && <button onClick={() => setCreating(true)} style={{ ...btnP, ...btnSm }}>＋ 新規作成</button>}
         </div>
-
-        {/* 新規作成フォーム */}
         {isAdmin && creating && (
           <div style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:12, padding:16, marginBottom:20 }}>
             <div style={{ fontFamily:FS, fontSize:15, fontWeight:600, color:C.accent, marginBottom:14 }}>新しいアンケートを作成</div>
             <label style={lbl}>タイトル</label>
-            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
-              placeholder="例：文化祭の出し物について" style={{ ...inp, marginBottom:10 }} />
+            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="例：文化祭の出し物について" style={{ ...inp, marginBottom:10 }} />
             <label style={lbl}>説明 <span style={{ fontWeight:400, color:C.inkLight }}>（任意）</span></label>
-            <input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))}
-              placeholder="例：みんなの意見を聞かせてください" style={{ ...inp, marginBottom:14 }} />
+            <input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} placeholder="例：みんなの意見を聞かせてください" style={{ ...inp, marginBottom:14 }} />
             <label style={lbl}>選択肢</label>
             {form.options.map((o,i) => (
               <div key={i} style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
-                <input value={o} onChange={e=>updateOption(i,e.target.value)}
-                  placeholder={`選択肢 ${i+1}`} style={{ ...inp }} />
+                <input value={o} onChange={e=>updateOption(i,e.target.value)} placeholder={`選択肢 ${i+1}`} style={{ ...inp }} />
                 {form.options.length > 2 && (
-                  <button onClick={()=>removeOption(i)}
-                    style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:12, padding:"6px 10px", borderRadius:6, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>削除</button>
+                  <button onClick={()=>removeOption(i)} style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:12, padding:"6px 10px", borderRadius:6, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>削除</button>
                 )}
               </div>
             ))}
             <button onClick={addOption} style={{ ...btnO, ...btnSm, marginBottom:14 }}>＋ 選択肢を追加</button>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
-              <input type="checkbox" id="allowFree" checked={form.allowFree}
-                onChange={e=>setForm(f=>({...f,allowFree:e.target.checked}))} style={{ width:16, height:16, accentColor:C.accent }} />
+              <input type="checkbox" id="allowFree" checked={form.allowFree} onChange={e=>setForm(f=>({...f,allowFree:e.target.checked}))} style={{ width:16, height:16, accentColor:C.accent }} />
               <label htmlFor="allowFree" style={{ fontFamily:FB, fontSize:13, color:C.inkMid, cursor:"pointer" }}>自由記述欄も追加する</label>
             </div>
             <div style={{ display:"flex", gap:8 }}>
@@ -681,11 +754,7 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
             </div>
           </div>
         )}
-
-        {surveys.length === 0 && (
-          <div style={{ fontFamily:FB, textAlign:"center", padding:"40px 0", color:C.inkLight, fontSize:13 }}>アンケートはまだありません</div>
-        )}
-
+        {surveys.length === 0 && <div style={{ fontFamily:FB, textAlign:"center", padding:"40px 0", color:C.inkLight, fontSize:13 }}>アンケートはまだありません</div>}
         {surveys.map(sv => {
           const total = sv.answers ? sv.answers.reduce((s,a)=>s+a.count,0) : 0;
           const isAnswering = answering === sv.id;
@@ -699,14 +768,9 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
                 </div>
                 <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
                   <span style={{ fontFamily:FB, fontSize:11, color:C.inkLight }}>{total}票</span>
-                  {isAdmin && (
-                    <button onClick={()=>setConfirmDel(sv.id)}
-                      style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 8px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>削除</button>
-                  )}
+                  {isAdmin && <button onClick={()=>setConfirmDel(sv.id)} style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 8px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>削除</button>}
                 </div>
               </div>
-
-              {/* 結果バー（管理者のみ） */}
               {isAdmin && (
                 <div style={{ marginBottom:12 }}>
                   {sv.options.map((opt, i) => {
@@ -728,7 +792,6 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
                   <div style={{ fontFamily:FB, fontSize:11, color:C.inkLight, textAlign:"right", marginTop:4 }}>合計 {total}票</div>
                 </div>
               )}
-              {/* 一般ユーザーには選択肢のリストのみ表示 */}
               {!isAdmin && (
                 <div style={{ marginBottom:12 }}>
                   {sv.options.map((opt, i) => (
@@ -736,23 +799,13 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
                   ))}
                 </div>
               )}
-
-              {/* 回答フォーム */}
-              {!myAnswer && !isAnswering && (
-                <button onClick={()=>{ setAnswering(sv.id); setSelected(null); setFreeText(""); }}
-                  style={{ ...btnP, ...btnSm }}>回答する</button>
-              )}
-              {myAnswer && (
-                <div style={{ fontFamily:FB, fontSize:12, color:C.green, fontWeight:700 }}>✓ 回答済み：{sv.options[myAnswer.index]}</div>
-              )}
+              {!myAnswer && !isAnswering && <button onClick={()=>{ setAnswering(sv.id); setSelected(null); setFreeText(""); }} style={{ ...btnP, ...btnSm }}>回答する</button>}
+              {myAnswer && <div style={{ fontFamily:FB, fontSize:12, color:C.green, fontWeight:700 }}>✓ 回答済み：{sv.options[myAnswer.index]}</div>}
               {isAnswering && (
                 <div style={{ background:C.accentBg, border:`1px solid ${C.accent}`, borderRadius:10, padding:14, marginTop:8 }}>
                   <div style={{ fontFamily:FB, fontSize:13, fontWeight:700, color:C.accent, marginBottom:10 }}>選択してください</div>
                   {sv.options.map((opt, i) => (
-                    <div key={i} onClick={()=>setSelected(i)}
-                      style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, marginBottom:6, cursor:"pointer",
-                        background: selected===i ? C.accent+"18" : C.paper,
-                        border: `1px solid ${selected===i ? C.accent : C.rule}` }}>
+                    <div key={i} onClick={()=>setSelected(i)} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, marginBottom:6, cursor:"pointer", background: selected===i ? C.accent+"18" : C.paper, border:`1px solid ${selected===i ? C.accent : C.rule}` }}>
                       <div style={{ width:18, height:18, borderRadius:"50%", border:`2px solid ${selected===i ? C.accent : C.rule}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                         {selected===i && <div style={{ width:8, height:8, borderRadius:"50%", background:C.accent }} />}
                       </div>
@@ -762,9 +815,7 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
                   {sv.allowFree && (
                     <div style={{ marginTop:10 }}>
                       <label style={lbl}>自由記述 <span style={{ fontWeight:400, color:C.inkLight }}>（任意）</span></label>
-                      <textarea value={freeText} onChange={e=>setFreeText(e.target.value)}
-                        rows={2} placeholder="自由にコメントを書いてください"
-                        style={{ ...inp, resize:"none", fontSize:13 }} />
+                      <textarea value={freeText} onChange={e=>setFreeText(e.target.value)} rows={2} placeholder="自由にコメントを書いてください" style={{ ...inp, resize:"none", fontSize:13 }} />
                     </div>
                   )}
                   <div style={{ display:"flex", gap:8, marginTop:12 }}>
@@ -777,11 +828,7 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
           );
         })}
       </div>
-      <ConfirmDialog
-        msg={confirmDel ? "このアンケートを削除してもよいですか？" : null}
-        onOk={()=>{ onDeleteSurvey(confirmDel); setConfirmDel(null); }}
-        onCancel={()=>setConfirmDel(null)}
-      />
+      <ConfirmDialog msg={confirmDel ? "このアンケートを削除してもよいですか？" : null} onOk={()=>{ onDeleteSurvey(confirmDel); setConfirmDel(null); }} onCancel={()=>setConfirmDel(null)} />
     </div>
   );
 }
@@ -790,40 +837,19 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
 function NotifBanner({ survey, onTap, onDismiss }) {
   const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
-
   useEffect(() => {
     playNotifSound();
     const t = setTimeout(() => dismiss(), 5000);
     return () => clearTimeout(t);
   }, [survey]);
-
-  const dismiss = () => {
-    setLeaving(true);
-    setTimeout(() => { setVisible(false); onDismiss(); }, 350);
-  };
-
+  const dismiss = () => { setLeaving(true); setTimeout(() => { setVisible(false); onDismiss(); }, 350); };
   if (!visible || !survey) return null;
   return (
-    <div
-      onClick={() => { onTap(); dismiss(); }}
-      style={{
-        position:"fixed", top:70, left:"50%", transform:"translateX(-50%)",
-        zIndex:9000,
-        width:"min(380px, 92vw)",
-        background:"rgba(30,30,40,0.92)",
-        backdropFilter:"blur(16px)",
-        borderRadius:18,
-        padding:"14px 18px",
-        display:"flex", alignItems:"center", gap:14,
-        boxShadow:"0 8px 32px rgba(0,0,0,0.28)",
-        cursor:"pointer",
-        animation:`${leaving ? "notifSlideOut" : "notifSlideIn"} 0.35s cubic-bezier(.32,1.2,.48,1) forwards`,
-      }}
-    >
+    <div onClick={() => { onTap(); dismiss(); }}
+      style={{ position:"fixed", top:70, left:"50%", transform:"translateX(-50%)", zIndex:9000, width:"min(380px, 92vw)", background:"rgba(30,30,40,0.92)", backdropFilter:"blur(16px)", borderRadius:18, padding:"14px 18px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 8px 32px rgba(0,0,0,0.28)", cursor:"pointer", animation:`${leaving ? "notifSlideOut" : "notifSlideIn"} 0.35s cubic-bezier(.32,1.2,.48,1) forwards` }}>
       <div style={{ width:40, height:40, borderRadius:10, background:C.accent, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/>
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/>
           <circle cx="6" cy="9" r="1" fill="#fff"/><circle cx="6" cy="13" r="1" fill="#fff"/>
         </svg>
       </div>
@@ -832,8 +858,7 @@ function NotifBanner({ survey, onTap, onDismiss }) {
         <div style={{ fontFamily:FB, fontSize:14, fontWeight:700, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{survey.title}</div>
         {survey.desc && <div style={{ fontFamily:FB, fontSize:12, color:"rgba(255,255,255,0.65)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{survey.desc}</div>}
       </div>
-      <button onClick={e=>{e.stopPropagation();dismiss();}}
-        style={{ background:"none", border:"none", color:"rgba(255,255,255,0.5)", fontSize:18, cursor:"pointer", padding:4, flexShrink:0 }}>×</button>
+      <button onClick={e=>{e.stopPropagation();dismiss();}} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.5)", fontSize:18, cursor:"pointer", padding:4, flexShrink:0 }}>×</button>
     </div>
   );
 }
@@ -848,133 +873,124 @@ function Toast({ msg }) {
   );
 }
 
+/* ── ナビアイコン ── */
+function NavIcon({ type, active, color }) {
+  const col = color || (active ? C.accent : C.inkLight);
+  const bg  = active ? col + "28" : "none";
+  const sz  = 24;
+  const icons = {
+    send: <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 2 15 22 11 13 2 9 22 2" fill={bg}/><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+    opinions: <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M20 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3l2 3 2-3h9a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z" stroke={col} strokeWidth="1.6" fill={bg}/><line x1="7" y1="8" x2="17" y2="8" stroke={col} strokeWidth="1.4"/><line x1="7" y1="12" x2="13" y2="12" stroke={col} strokeWidth="1.4"/></svg>,
+    events: <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" fill={bg}/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    survey: <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" fill={bg}/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>,
+    settings: <svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" fill={bg}/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  };
+  return <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>{icons[type]}</span>;
+}
+
 /* ── ボトムナビ ── */
-function BottomNav({ page, setPage, onAdminClick, isAdmin, modalOpen, unreadCount, onClearUnread }) {
+function BottomNav({ page, setPage, unreadCount, onClearUnread }) {
   const tabs = [
     { id:"send",     icon:"send",     label:"意見を送る" },
     { id:"opinions", icon:"opinions", label:"みんなの声" },
     { id:"events",   icon:"events",   label:"予定表" },
     { id:"survey",   icon:"survey",   label:"アンケート" },
+    { id:"settings", icon:"settings", label:"設定" },
   ];
-  const btnStyle = (active) => ({
-    flex:1, background:"none", border:"none", fontFamily:FB, fontSize:10,
-    fontWeight: active ? 700 : 500, color: active ? C.accent : C.inkLight,
-    padding:"10px 4px 8px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-  });
+  const btnStyle = (active) => ({ flex:1, background:"none", border:"none", fontFamily:FB, fontSize:10, fontWeight: active ? 700 : 500, color: active ? C.accent : C.inkLight, padding:"10px 4px 8px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:3 });
   return (
     <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:C.paper, borderTop:`1px solid ${C.rule}`, zIndex:300, display:"flex", alignItems:"stretch" }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => { setPage(t.id); if(t.id==="survey") onClearUnread(); }}
-          style={{ ...btnStyle(!modalOpen && page === t.id), position:"relative" }}>
-          <NavIcon type={t.icon} active={!modalOpen && page === t.id} />
+          style={{ ...btnStyle(page === t.id), position:"relative" }}>
+          <NavIcon type={t.icon} active={page === t.id} />
           {t.label}
           {t.id === "survey" && unreadCount > 0 && (
             <span style={{ position:"absolute", top:6, right:"calc(50% - 14px)", width:14, height:14, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
           )}
         </button>
       ))}
-      <button onClick={onAdminClick} style={{ ...btnStyle(modalOpen || isAdmin), color: isAdmin ? C.amber : (modalOpen ? C.accent : C.inkLight) }}>
-        <NavIcon type="admin" active={modalOpen || isAdmin} color={isAdmin ? C.amber : (modalOpen ? C.accent : C.inkLight)} />
-        管理
-      </button>
     </nav>
   );
 }
 
 /* ── 通知音 ── */
-// バナー表示時：iPhoneライクな3音の上昇チャイム
 function playNotifSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const now = ctx.currentTime;
-    const notes = [
-      { freq:1046.5, t:0,    dur:0.18 }, // C6
-      { freq:1318.5, t:0.1,  dur:0.18 }, // E6
-      { freq:1568.0, t:0.2,  dur:0.35 }, // G6
-    ];
-    notes.forEach(({ freq, t, dur }) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, now + t);
-      gain.gain.linearRampToValueAtTime(0.18, now + t + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + t + dur);
-      osc.start(now + t);
-      osc.stop(now + t + dur + 0.05);
+    [{ freq:1046.5, t:0, dur:0.18 },{ freq:1318.5, t:0.1, dur:0.18 },{ freq:1568.0, t:0.2, dur:0.35 }].forEach(({ freq, t, dur }) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now+t); gain.gain.linearRampToValueAtTime(0.18, now+t+0.015); gain.gain.exponentialRampToValueAtTime(0.001, now+t+dur);
+      osc.start(now+t); osc.stop(now+t+dur+0.05);
     });
   } catch(e) {}
 }
 
-
-/* ── GAS通信ヘルパー ── */
-async function gasGet(action) {
-  const res = await fetch(`${GAS_URL}?action=${action}`);
-  return res.json();
-}
-async function gasPost(body) {
-  const res = await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return res.json();
-}
-
-/* ── メインアプリ ── */
+/* ============================================================
+   メインアプリ
+   ============================================================ */
 export default function App() {
+  const [user, setUser]           = useState(null);    // ログイン中のユーザー
+  const [authChecked, setAuthChecked] = useState(false);
   const [page, setPageRaw]        = useState("send");
-  const setPage = (p) => { setPageRaw(p); window.scrollTo({ top: 0, behavior: "instant" }); };
-  const [opinions, setOpinions]   = useState(USE_GAS ? [] : DEMO_OPINIONS_INIT);
-  const [events, setEvents]       = useState(USE_GAS ? [] : DEMO_EVENTS_INIT);
-  const [loading, setLoading]     = useState(USE_GAS);
-  const [isAdmin, setIsAdmin]     = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [toast, setToast]         = useState("");
+  const setPage = (p) => { setPageRaw(p); window.scrollTo({ top:0, behavior:"instant" }); };
+  const [opinions, setOpinions]   = useState([]);
+  const [events, setEvents]       = useState([]);
   const [surveys, setSurveys]     = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [notifSurvey, setNotifSurvey] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const toastTimer = useRef(null);
-  const isMobile = useWidth() < 720;
-  let nextEvId = useRef(DEMO_EVENTS_INIT.length + 1);
-  let nextSvId = useRef(1);
+  const [toast, setToast]         = useState("");
+  const toastTimer                = useRef(null);
+  const isMobile                  = useWidth() < 720;
+  let nextEvId                    = useRef(DEMO_EVENTS_INIT.length + 1);
+  let nextSvId                    = useRef(1);
 
-  // GAS接続時：初回データ取得
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
+  // localStorageからログイン状態を復元
   useEffect(() => {
-    if (!USE_GAS) return;
+    const saved = localStorage.getItem("authUser");
+    if (saved) { try { setUser(JSON.parse(saved)); } catch(e) {} }
+    setAuthChecked(true);
+  }, []);
+
+  // ログイン後のデータ取得
+  useEffect(() => {
+    if (!user || !USE_GAS) return;
+    setLoading(true);
     Promise.all([gasGet("getOpinions"), gasGet("getEvents"), gasGet("getSurveys")])
       .then(([ops, evs, svs]) => {
         setOpinions(Array.isArray(ops) ? ops : []);
         setEvents(Array.isArray(evs) ? evs.sort((a,b) => a.date.localeCompare(b.date)) : []);
         const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers") || "{}");
-        setSurveys((Array.isArray(svs) ? svs : []).map(sv => ({
-          ...sv,
-          myAnswer: savedAnswers[sv.id] || null,
-        })));
+        setSurveys((Array.isArray(svs) ? svs : []).map(sv => ({ ...sv, myAnswer: savedAnswers[sv.id] || null })));
       })
-      .catch(() => setOpinions(DEMO_OPINIONS_INIT))
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   const showToast = msg => {
-    setToast(msg);
-    clearTimeout(toastTimer.current);
+    setToast(msg); clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 3000);
   };
 
-  const handleLogin  = pw  => { if (pw === ADMIN_PW) { setIsAdmin(true); showToast("管理モードに入りました"); setModalOpen(false); } else showToast("パスワードが違います"); };
-  const handleLogout = ()  => { setIsAdmin(false); showToast("ログアウトしました"); setModalOpen(false); };
+  const handleLogin  = (u) => { setUser(u); showToast("ログインしました"); };
+  const handleLogout = () => {
+    localStorage.removeItem("authUser");
+    setUser(null); setOpinions([]); setEvents([]); setSurveys([]);
+    showToast("ログアウトしました");
+  };
+  const handleUpdateUser = (updated) => { setUser(updated); showToast("プロフィールを更新しました"); };
 
   const handleSubmit = async ({ name, message }) => {
     if (USE_GAS) {
-      await gasPost({ action:"addOpinion", name, message });
+      await gasPost({ action:"addOpinion", name, message, authorEmail: user.email, authorName: user.displayName, authorInfo: user.grade && user.classNum ? `${user.grade}年${user.classNum}組` : "" });
       const ops = await gasGet("getOpinions");
       setOpinions(Array.isArray(ops) ? ops : []);
-    } else {
-      const now = new Date();
-      const ts  = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,"0")}/${String(now.getDate()).padStart(2,"0")} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-      setOpinions(prev => [{ row:prev.length+1, name, timestamp:ts, message, status:"未採用", progress:"未着手", pct:0, notes:"", reply:"", replyImage:null }, ...prev]);
     }
     showToast("意見を送信しました");
   };
@@ -984,18 +1000,15 @@ export default function App() {
     setOpinions(prev => prev.map(o => o.row === row ? { ...o, status: adopt ? "採用" : "未採用" } : o));
     showToast(adopt ? "採用しました" : "採用を取り消しました");
   };
-
   const handleSetProgress = async (row, progress) => {
     if (USE_GAS) await gasPost({ action:"updateOpinion", row, progress });
     setOpinions(prev => prev.map(o => o.row === row ? { ...o, progress } : o));
     showToast(`「${progress}」に変更しました`);
   };
-
   const handleSetPct = async (row, pct) => {
     if (USE_GAS) await gasPost({ action:"updateOpinion", row, pct });
     setOpinions(prev => prev.map(o => o.row === row ? { ...o, pct } : o));
   };
-
   const handleSetReply = async (row, reply, replyImage) => {
     if (USE_GAS) await gasPost({ action:"updateOpinion", row, reply: reply || "" });
     setOpinions(prev => prev.map(o => o.row === row ? { ...o, reply, replyImage } : o));
@@ -1003,33 +1016,16 @@ export default function App() {
   };
 
   const handleAddEvent = async ({ date, title, desc }) => {
-    if (USE_GAS) {
-      await gasPost({ action:"addEvent", date, title, desc });
-      const evs = await gasGet("getEvents");
-      setEvents(Array.isArray(evs) ? evs.sort((a,b) => a.date.localeCompare(b.date)) : []);
-    } else {
-      const id = nextEvId.current++;
-      setEvents(prev => [...prev, { id, date, title, desc }].sort((a,b) => a.date.localeCompare(b.date)));
-    }
+    if (USE_GAS) { await gasPost({ action:"addEvent", date, title, desc }); const evs = await gasGet("getEvents"); setEvents(Array.isArray(evs) ? evs.sort((a,b)=>a.date.localeCompare(b.date)) : []); }
     showToast("予定を追加しました");
   };
   const handleEditEvent = async (id, { date, title, desc }) => {
-    if (USE_GAS) {
-      await gasPost({ action:"editEvent", id, date, title, desc });
-      const evs = await gasGet("getEvents");
-      setEvents(Array.isArray(evs) ? evs.sort((a,b) => a.date.localeCompare(b.date)) : []);
-    } else {
-      setEvents(prev => prev.map(e => e.id === id ? { ...e, date, title, desc } : e).sort((a,b) => a.date.localeCompare(b.date)));
-    }
+    if (USE_GAS) { await gasPost({ action:"editEvent", id, date, title, desc }); const evs = await gasGet("getEvents"); setEvents(Array.isArray(evs) ? evs.sort((a,b)=>a.date.localeCompare(b.date)) : []); }
     showToast("予定を更新しました");
   };
   const handleDeleteEvent = async (id) => {
-    if (USE_GAS) {
-      await gasPost({ action:"deleteEvent", id });
-      setEvents(prev => prev.filter(e => e.id !== id));
-    } else {
-      setEvents(prev => prev.filter(e => e.id !== id));
-    }
+    if (USE_GAS) await gasPost({ action:"deleteEvent", id });
+    setEvents(prev => prev.filter(e => e.id !== id));
     showToast("予定を削除しました");
   };
 
@@ -1040,13 +1036,7 @@ export default function App() {
       const loaded = Array.isArray(svs) ? svs : [];
       setSurveys(loaded);
       const newSv = loaded[0];
-      if (newSv) { setNotifSurvey(newSv); setUnreadCount(c => c + 1); }
-    } else {
-      const id = nextSvId.current++;
-      const newSv = { id, ...sv, answers: sv.options.map((_,i)=>({index:i,count:0})), myAnswer:null, createdAt: Date.now() };
-      setSurveys(prev => [newSv, ...prev]);
-      setNotifSurvey(newSv);
-      setUnreadCount(c => c + 1);
+      if (newSv) { setNotifSurvey(newSv); setUnreadCount(c => c+1); }
     }
     showToast("アンケートを公開しました");
   };
@@ -1057,27 +1047,12 @@ export default function App() {
       const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers") || "{}");
       savedAnswers[id] = { index: optionIndex, freeText: freeText || "" };
       localStorage.setItem("surveyAnswers", JSON.stringify(savedAnswers));
-      setSurveys(prev => {
-        const loaded = Array.isArray(svs) ? svs : prev;
-        return loaded.map(sv => sv.id === id ? { ...sv, myAnswer: { index: optionIndex, freeText } } : sv);
-      });
-    } else {
-      setSurveys(prev => prev.map(sv => {
-        if (sv.id !== id) return sv;
-        const answers = sv.answers.map(a => a.index === optionIndex ? { ...a, count: a.count + 1 } : a);
-        return { ...sv, answers, myAnswer: { index: optionIndex, freeText } };
-      }));
+      setSurveys(prev => { const loaded = Array.isArray(svs) ? svs : prev; return loaded.map(sv => sv.id === id ? { ...sv, myAnswer: { index: optionIndex, freeText } } : sv); });
     }
     showToast("回答しました！");
   };
   const handleDeleteSurvey = async (id) => {
-    if (USE_GAS) {
-      await gasPost({ action:"deleteSurvey", id });
-      const svs = await gasGet("getSurveys");
-      setSurveys(Array.isArray(svs) ? svs : []);
-    } else {
-      setSurveys(prev => prev.filter(sv => sv.id !== id));
-    }
+    if (USE_GAS) { await gasPost({ action:"deleteSurvey", id }); const svs = await gasGet("getSurveys"); setSurveys(Array.isArray(svs) ? svs : []); }
     showToast("アンケートを削除しました");
   };
 
@@ -1088,32 +1063,40 @@ export default function App() {
     { id:"survey",   label:"アンケート" },
   ];
 
+  // 認証確認前はローディング
+  if (!authChecked) return null;
+
+  // 未ログインはログイン画面
+  if (!user) return (
+    <>
+      <AuthPage onLogin={handleLogin} />
+      <Toast msg={toast} />
+    </>
+  );
+
   return (
     <div style={{ fontFamily:FB, background:C.wash, minHeight:"100vh", color:C.ink, lineHeight:1.7 }}>
-
       {/* ヘッダー */}
       <header style={{ background:C.paper, borderBottom:`1px solid ${C.rule}`, position:"sticky", top:0, zIndex:200 }}>
         <div style={{ maxWidth:1060, margin:"auto", padding:"0 20px", height:56, display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
           <div onClick={() => setPage("send")} style={{ display:"flex", alignItems:"baseline", gap:10, cursor:"pointer", flexShrink:0 }}>
             <span style={{ fontFamily:FS, fontWeight:600, fontSize:16, letterSpacing:"0.04em", color:C.ink }}>みんなの意見箱</span>
+            {isAdmin && <span style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.amber, background:C.amberBg, padding:"2px 8px", borderRadius:100 }}>管理者</span>}
           </div>
           {isMobile && (
-            <button onClick={() => { setPage("survey"); setUnreadCount(0); }}
-              style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", marginLeft:"auto" }}>
+            <button onClick={() => { setPage("survey"); setUnreadCount(0); }} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", marginLeft:"auto" }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
               </svg>
-              {unreadCount > 0 && (
-                <span style={{ position:"absolute", top:2, right:2, width:15, height:15, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
-              )}
+              {unreadCount > 0 && <span style={{ position:"absolute", top:2, right:2, width:15, height:15, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>}
             </button>
           )}
           {!isMobile && (
             <nav style={{ display:"flex", gap:2 }}>
-              {tabs.map(t => (
+              {[...tabs, { id:"settings", label:"設定" }].map(t => (
                 <button key={t.id} onClick={() => setPage(t.id)}
-                  style={{ fontFamily:FB, background: (!modalOpen && page===t.id) ? C.accentBg : "none", border:"none", fontSize:13, fontWeight: (!modalOpen && page===t.id) ? 700 : 500, color: (!modalOpen && page===t.id) ? C.accent : C.inkMid, padding:"6px 12px", borderRadius:8, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:6, transition:"background .15s" }}>
-                  <NavIcon type={t.icon} active={!modalOpen && page===t.id} />
+                  style={{ fontFamily:FB, background: page===t.id ? C.accentBg : "none", border:"none", fontSize:13, fontWeight: page===t.id ? 700 : 500, color: page===t.id ? C.accent : C.inkMid, padding:"6px 12px", borderRadius:8, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:6, transition:"background .15s" }}>
+                  <NavIcon type={t.id === "settings" ? "settings" : t.id} active={page===t.id} />
                   {t.label}
                 </button>
               ))}
@@ -1121,21 +1104,13 @@ export default function App() {
           )}
           {!isMobile && (
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              {/* 通知アイコン */}
-              <button onClick={() => { setPage("survey"); setUnreadCount(0); }}
-                style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+              <button onClick={() => { setPage("survey"); setUnreadCount(0); }} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                {unreadCount > 0 && (
-                  <span style={{ position:"absolute", top:2, right:2, width:16, height:16, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:9, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>
-                )}
+                {unreadCount > 0 && <span style={{ position:"absolute", top:2, right:2, width:16, height:16, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:9, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>}
               </button>
-              <button onClick={() => setModalOpen(true)}
-                style={{ fontFamily:FB, background: isAdmin ? C.amberBg : (modalOpen ? C.accentBg : "none"), border:`1px solid ${isAdmin ? C.amber : (modalOpen ? C.accent : C.rule)}`, fontSize:12, fontWeight:700, color: isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid), padding:"5px 14px", borderRadius:100, cursor:"pointer", whiteSpace:"nowrap", display:"flex", alignItems:"center", gap:6 }}>
-                <NavIcon type="admin" active={modalOpen || isAdmin} color={isAdmin ? C.amber : (modalOpen ? C.accent : C.inkMid)} />
-                {isAdmin ? "管理中" : "管理者"}
-              </button>
+              <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid }}>{user.displayName}</div>
             </div>
           )}
         </div>
@@ -1143,26 +1118,22 @@ export default function App() {
 
       {/* メイン */}
       <main style={{ maxWidth:1060, margin:"24px auto", padding: isMobile ? "0 12px" : "0 24px", paddingBottom: isMobile ? 90 : 60 }}>
-        {page === "send"     && <SendPage onSubmit={handleSubmit} />}
-        {page === "opinions" && <OpinionsPage opinions={opinions} isAdmin={isAdmin} onToggleAdopt={handleToggleAdopt} onSetProgress={handleSetProgress} onSetPct={handleSetPct} onSetReply={handleSetReply} />}
-        {page === "events"   && <EventsPage events={events} isAdmin={isAdmin} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
-        {page === "survey"   && <SurveyPage surveys={surveys} isAdmin={isAdmin} onAddSurvey={handleAddSurvey} onAnswerSurvey={handleAnswerSurvey} onDeleteSurvey={handleDeleteSurvey} />}
+        {loading ? (
+          <div style={{ textAlign:"center", padding:"60px 0", fontFamily:FB, color:C.inkLight }}>読み込み中...</div>
+        ) : (
+          <>
+            {page === "send"     && <SendPage onSubmit={handleSubmit} />}
+            {page === "opinions" && <OpinionsPage opinions={opinions} isAdmin={isAdmin} onToggleAdopt={handleToggleAdopt} onSetProgress={handleSetProgress} onSetPct={handleSetPct} onSetReply={handleSetReply} />}
+            {page === "events"   && <EventsPage events={events} isAdmin={isAdmin} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} />}
+            {page === "survey"   && <SurveyPage surveys={surveys} isAdmin={isAdmin} onAddSurvey={handleAddSurvey} onAnswerSurvey={handleAnswerSurvey} onDeleteSurvey={handleDeleteSurvey} />}
+            {page === "settings" && <SettingsPage user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />}
+          </>
+        )}
       </main>
 
-      {isMobile && <BottomNav page={page} setPage={setPage} onAdminClick={() => setModalOpen(true)} isAdmin={isAdmin} modalOpen={modalOpen} unreadCount={unreadCount} onClearUnread={() => setUnreadCount(0)} />}
-
-      <AdminModal
-        isOpen={modalOpen} isAdmin={isAdmin}
-        onClose={() => setModalOpen(false)}
-        onLogin={handleLogin} onLogout={handleLogout}
-        onGoOpinions={() => setPage("opinions")}
-      />
+      {isMobile && <BottomNav page={page} setPage={setPage} unreadCount={unreadCount} onClearUnread={() => setUnreadCount(0)} />}
       <Toast msg={toast} />
-      <NotifBanner
-        survey={notifSurvey}
-        onTap={() => { setPage("survey"); setUnreadCount(0); }}
-        onDismiss={() => setNotifSurvey(null)}
-      />
+      <NotifBanner survey={notifSurvey} onTap={() => { setPage("survey"); setUnreadCount(0); }} onDismiss={() => setNotifSurvey(null)} />
     </div>
   );
 }

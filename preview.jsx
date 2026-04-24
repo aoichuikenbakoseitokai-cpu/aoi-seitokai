@@ -132,6 +132,75 @@ function AnimBar({ pct, color }) {
   );
 }
 
+/* ── 進捗スライダー（ローカルstate管理でスムーズ操作） ── */
+function PctSlider({ row, pct, progress, onSetPct, onSetProgress, C }) {
+  const [localPct, setLocalPct] = useState(pct);
+  const timer = useRef(null);
+  useEffect(() => { setLocalPct(pct); }, [pct]);
+  const handleChange = (e) => {
+    const val = Number(e.target.value);
+    setLocalPct(val);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onSetPct(row, val), 400);
+  };
+  const bg = `linear-gradient(to right, ${C.accent} ${localPct}%, ${C.rule} ${localPct}%)`;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      <select value={progress} onChange={e=>onSetProgress(row, e.target.value)}
+        style={{ fontFamily:"'Zen Kaku Gothic New',sans-serif", fontSize:12, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:6, padding:"4px 8px", outline:"none", cursor:"pointer" }}>
+        {["未着手","進行中","完了"].map(p=><option key={p} value={p}>{p}</option>)}
+      </select>
+      <input type="range" min={0} max={100} step={1} value={localPct}
+        onChange={handleChange}
+        style={{ flex:1, background:bg, cursor:"pointer" }} />
+      <span style={{ fontFamily:"'Zen Kaku Gothic New',sans-serif", fontSize:11, fontWeight:700, color:C.accent, minWidth:32, textAlign:"right" }}>{localPct}%</span>
+    </div>
+  );
+}
+
+/* ── AOIローディング画面 ── */
+function AoiLoading() {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#e8f4ff", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", zIndex:9999 }}>
+      <div style={{ position:"relative", display:"inline-block", marginBottom:24 }}>
+        <svg width="120" height="140" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="60" cy="105" rx="32" ry="38" fill="#29b6e8"/>
+          <circle cx="60" cy="58" r="38" fill="#29b6e8"/>
+          <ellipse cx="22" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(-15 22 52)"/>
+          <ellipse cx="98" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(15 98 52)"/>
+          <circle cx="44" cy="55" r="10" fill="white"/>
+          <circle cx="76" cy="55" r="10" fill="white"/>
+          <circle cx="44" cy="57" r="6" fill="#1a1a2e"/>
+          <circle cx="76" cy="57" r="6" fill="#1a1a2e"/>
+          <circle cx="46" cy="55" r="2" fill="white"/>
+          <circle cx="78" cy="55" r="2" fill="white"/>
+          <ellipse cx="60" cy="68" rx="5" ry="4" fill="#f8a4c8"/>
+          <path d="M52 74 Q60 80 68 74" stroke="#1a1a2e" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          <circle cx="50" cy="30" r="4" fill="#8dd44a"/>
+          <circle cx="60" cy="24" r="4" fill="#8dd44a"/>
+          <circle cx="70" cy="30" r="4" fill="#8dd44a"/>
+          <circle cx="18" cy="100" r="10" fill="#ffd44a"/>
+          <circle cx="18" cy="100" r="5" fill="#f8a4c8"/>
+          <circle cx="102" cy="100" r="10" fill="#ffd44a"/>
+          <circle cx="102" cy="100" r="5" fill="#f8a4c8"/>
+          <text x="60" y="115" textAnchor="middle" fill="#f8a4c8" fontSize="14" fontWeight="bold" fontFamily="sans-serif">AOI</text>
+        </svg>
+        <div style={{ position:"absolute", top:-16, left:"50%", transform:"translateX(-50%)" }}>
+          <svg width="36" height="36" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#c8e8ff" strokeWidth="3"/>
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#29b6e8" strokeWidth="3"
+              strokeDasharray="60 36" strokeLinecap="round"
+              style={{ transformOrigin:"18px 18px", animation:"aoiSpin 1s linear infinite" }}/>
+          </svg>
+        </div>
+      </div>
+      <div style={{ fontFamily:"'Zen Kaku Gothic New',sans-serif", fontSize:16, fontWeight:700, color:"#29b6e8", letterSpacing:"0.05em" }}>AOIがよみこんでいるよ！</div>
+      <div style={{ fontFamily:"'Zen Kaku Gothic New',sans-serif", fontSize:12, color:"#6bc8e8", marginTop:4 }}>ちょっとまってね…</div>
+      <style>{`@keyframes aoiSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+    </div>
+  );
+}
+
 /* ============================================================
    ログイン・登録画面
    ============================================================ */
@@ -275,9 +344,9 @@ function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, C,
   };
 
   const sections = [
-    { key:"profile", label:"プロフィール設定", icon:"👤" },
-    { key:"password", label:"パスワード変更", icon:"🔒" },
-    { key:"appearance", label:"表示設定", icon:"🎨" },
+    { key:"profile", label:"プロフィール設定" },
+    { key:"password", label:"パスワード変更" },
+    { key:"appearance", label:"表示設定" },
   ];
 
   return (
@@ -291,7 +360,7 @@ function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, C,
       {sections.map(sec => (
         <div key={sec.key} style={S.card}>
           <button onClick={() => toggle(sec.key)} style={{ width:"100%", background:"none", border:"none", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", padding:0, fontFamily:FB, fontSize:15, fontWeight:700, color:C.ink }}>
-            <span>{sec.icon} {sec.label}</span>
+            <span>{sec.label}</span>
             <span style={{ color:C.inkLight, fontSize:18, transition:"transform .2s", transform:open===sec.key?"rotate(180deg)":"rotate(0)" }}>▾</span>
           </button>
 
@@ -514,15 +583,7 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
                       <span style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.accent }}>{item.pct??0}%</span>
                     </div>
                     {isAdmin ? (
-                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <select value={item.progress||"未着手"} onChange={e=>onSetProgress(item.row,e.target.value)}
-                          style={{ fontFamily:FB, fontSize:12, color:C.ink, background:C.wash, border:`1px solid ${C.rule}`, borderRadius:6, padding:"4px 8px", outline:"none", cursor:"pointer" }}>
-                          {PROGRESS_OPTIONS.map(p=><option key={p} value={p}>{p}</option>)}
-                        </select>
-                        <input type="range" min={0} max={100} step={1} value={item.pct??0}
-                          onChange={e=>onSetPct(item.row,Number(e.target.value))}
-                          style={{ flex:1, "--accent":C.accent, background:`linear-gradient(to right, ${C.accent} ${item.pct??0}%, ${C.rule} ${item.pct??0}%)`, cursor:"pointer" }} />
-                      </div>
+                      <PctSlider row={item.row} pct={item.pct??0} progress={item.progress||"未着手"} onSetPct={onSetPct} onSetProgress={onSetProgress} C={C} />
                     ) : (
                       <AnimBar pct={item.pct??0} color={C.accent} />
                     )}
@@ -991,23 +1052,25 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
           </div>
         )}
 
-        {/* タブ切り替え */}
-        <div style={{ display:"flex", borderRadius:10, overflow:"hidden", border:`1px solid ${C.rule}`, marginBottom:16 }}>
-          {tabList.map(t=>(
-            <button key={t.key} onClick={()=>setTab(t.key)}
-              style={{ flex:1, fontFamily:FB, fontSize:12, fontWeight:700, padding:"9px 4px", border:"none", cursor:"pointer", background:tab===t.key?C.accent:C.paper, color:tab===t.key?"#fff":C.inkMid, transition:"all .15s", position:"relative" }}>
-              {t.label}
-              {t.count>0 && <span style={{ marginLeft:4, background:tab===t.key?"rgba(255,255,255,0.3)":C.rule, borderRadius:100, padding:"1px 6px", fontSize:10 }}>{t.count}</span>}
+        {/* セクション別アコーディオン */}
+        {tabList.map(sec => (
+          <div key={sec.key} style={{ marginBottom:8 }}>
+            <button onClick={()=>setTab(tab===sec.key?null:sec.key)}
+              style={{ width:"100%", display:"flex", justifyContent:"space-between", alignItems:"center", background:tab===sec.key?C.accentBg:C.wash, border:`1px solid ${tab===sec.key?C.accent:C.rule}`, borderRadius:10, padding:"12px 16px", cursor:"pointer", fontFamily:FB, fontSize:14, fontWeight:700, color:tab===sec.key?C.accent:C.ink, transition:"all .15s" }}>
+              <span>{sec.label} {sec.count>0&&<span style={{ fontFamily:FB, fontSize:12, fontWeight:400, color:tab===sec.key?C.accent:C.inkLight }}>（{sec.count}件）</span>}</span>
+              <span style={{ fontSize:16, color:C.inkLight, transition:"transform .2s", transform:tab===sec.key?"rotate(180deg)":"rotate(0)" }}>▾</span>
             </button>
-          ))}
-        </div>
-
-        {displaySurveys.length===0 && (
-          <div style={{ fontFamily:FB, textAlign:"center", padding:"40px 0", color:C.inkLight, fontSize:13 }}>
-            {tab==="active"?"未回答のアンケートはありません":tab==="answered"?"回答済みのアンケートはありません":"過去のアンケートはありません"}
+            {tab===sec.key && (
+              <div style={{ marginTop:8 }}>
+                {(sec.key==="active"?activeSurveys:sec.key==="answered"?answeredSurveys:pastSurveys).length===0 ? (
+                  <div style={{ fontFamily:FB, textAlign:"center", padding:"24px 0", color:C.inkLight, fontSize:13 }}>
+                    {sec.key==="active"?"未回答のアンケートはありません":sec.key==="answered"?"回答済みのアンケートはありません":"過去のアンケートはありません"}
+                  </div>
+                ) : (sec.key==="active"?activeSurveys:sec.key==="answered"?answeredSurveys:pastSurveys).map(sv=>renderSurveyCard(sv))}
+              </div>
+            )}
           </div>
-        )}
-        {displaySurveys.map(sv=>renderSurveyCard(sv))}
+        ))}
       </div>
       <ConfirmDialog msg={confirmDel?"このアンケートを削除してもよいですか？":null} onOk={()=>{onDeleteSurvey(confirmDel);setConfirmDel(null);}} onCancel={()=>setConfirmDel(null)} C={C} S={S} />
     </div>
@@ -1018,7 +1081,9 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
 function NotifBanner({ survey, onTap, onDismiss, C }) {
   const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
+  const isFirst = useRef(true);
   useEffect(() => {
+    if (isFirst.current) { isFirst.current = false; return; }
     playNotifSound();
     const t = setTimeout(()=>dismiss(), 5000);
     return ()=>clearTimeout(t);
@@ -1161,6 +1226,18 @@ export default function App() {
       .finally(()=>setLoading(false));
   }, [user]);
 
+  // みんなの声 自動更新（30秒ごと）
+  useEffect(() => {
+    if (!user || !USE_GAS) return;
+    const interval = setInterval(async () => {
+      try {
+        const ops = await gasGet("getOpinions");
+        if (Array.isArray(ops)) setOpinions(ops);
+      } catch(e) {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const showToast = msg => {
     setToast(msg); clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(()=>setToast(""),3000);
@@ -1296,7 +1373,7 @@ export default function App() {
       {/* メイン */}
       <main style={{ maxWidth:1060, margin:"24px auto", padding:isMobile?"0 12px":"0 24px", paddingBottom:isMobile?90:60 }}>
         {loading ? (
-          <div style={{ textAlign:"center", padding:"60px 0", fontFamily:FB, color:C.inkLight }}>読み込み中...</div>
+          <AoiLoading />
         ) : (
           <>
             {page==="send"     && <SendPage onSubmit={handleSubmit} C={C} S={S} />}

@@ -32,7 +32,102 @@ const PROGRESS_STYLE = {
   "進行中": { bg:"#fff7ed", color:"#c2410c", border:"#fed7aa" },
   "完了":   { bg:"#f0faf4", color:"#1a7a4a", border:"#a7dfc0" },
 };
+
+/* ── 利用規約・プライバシーポリシー ── */
+const TERMS = `葵中学校 生徒会デジタル意見箱 利用規約
+
+第1条（目的）
+本サービスは、葵中学校の生徒が学校生活に関する意見や要望を安心して提出できるようにすることを目的として、葵中学校生徒会が運営するものです。
+
+第2条（利用対象）
+本サービスは、葵中学校に在籍する生徒および教職員を対象とします。
+
+第3条（利用方法）
+利用者は、本サービスを通じて自由に意見や要望を送信することができます。投稿は匿名で行うことができます。
+
+第4条（禁止事項）
+・誹謗中傷や他者を傷つける内容の投稿
+・個人情報を含む投稿
+・虚偽の情報や不適切な内容の投稿
+・学校の秩序を乱す行為
+・その他、生徒会が不適切と判断する行為
+
+第5条（投稿内容の管理）
+投稿された内容は、生徒会および顧問教員が確認します。不適切と判断された投稿は予告なく削除される場合があります。
+
+第6条（個人情報の取り扱い）
+本サービスでは、個人を特定できる情報の収集は行いません。
+
+第7条（サービスの変更・停止）
+生徒会は、必要に応じて本サービスの内容を変更または停止することがあります。
+
+第8条（免責事項）
+投稿された内容に関して発生したトラブルについて、生徒会は責任を負いかねます。
+
+第9条（運営）
+本サービスは、葵中学校生徒会が運営し、顧問教員の指導のもと管理されます。
+
+第10条（規約の変更）
+本規約は、必要に応じて変更される場合があります。
+
+附則：本規約は、2026年4月より施行します。`;
+
+const PRIVACY = `葵中学校 生徒会デジタル意見箱 プライバシーポリシー
+
+第1条（基本方針）
+葵中学校生徒会は、本サービスにおいて利用者のプライバシーを尊重し、安全な運用に努めます。
+
+第2条（収集する情報）
+・利用者が入力した意見・要望の内容
+・サービスの安定運用のために必要な技術的情報
+※氏名・住所・電話番号など、個人を特定できる情報の収集は行いません。
+
+第3条（情報の利用目的）
+・学校生活の改善
+・生徒会活動の向上
+・不適切な投稿の確認および対応
+
+第4条（情報の管理）
+投稿された内容は、生徒会および顧問教員が適切に管理します。情報は必要な範囲でのみ利用されます。
+
+第5条（第三者への提供）
+本サービスで取得した情報は、法令に基づく場合を除き、第三者に提供することはありません。
+
+第6条（外部サービスについて）
+本サービスは、運用上必要に応じて外部サービスを利用する場合があります。
+
+第7条（安全対策）
+生徒会は、不正アクセスや情報漏えいを防ぐため、適切な管理および運用を行います。
+
+第8条（ポリシーの変更）
+本ポリシーは、必要に応じて変更されることがあります。
+
+第9条（お問い合わせ）
+本ポリシーに関するお問い合わせは、葵中学校生徒会または顧問教員までご連絡ください。
+
+附則：本ポリシーは、2026年4月より施行します。`;
+
 const WD = ["日","月","火","水","木","金","土"];
+
+/* ── 締め切り日時フォーマット（日本時間） ── */
+function formatDeadline(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return `${d.getMonth()+1}月${d.getDate()}日 23時59分まで`;
+}
+
+/* ── 締め切り日付を当日23:59:59 JSTに変換 ── */
+function toDeadlineISO(dateStr) {
+  if (!dateStr) return null;
+  // JST = UTC+9 → 23:59:59 JST = 14:59:59 UTC
+  return dateStr + "T14:59:59.000Z";
+}
+
+/* ── 締め切りチェック（JSTで判定） ── */
+function isPastDeadline(deadlineISO) {
+  if (!deadlineISO) return false;
+  return new Date() > new Date(deadlineISO);
+}
 
 /* ── カラーテーマ ── */
 const THEMES = {
@@ -158,39 +253,40 @@ function PctSlider({ row, pct, progress, onSetPct, onSetProgress, C }) {
   );
 }
 
-/* ── AOIローディング画面 ── */
+/* ── AOIローディング画面（写真使用） ── */
+const AOI_IMG_URL = "https://raw.githubusercontent.com/aoichuikenbakoseitokai/aoi-seitokai/main/aoi.png";
+
 function AoiLoading() {
+  const [imgOk, setImgOk] = useState(true);
   return (
     <div style={{ position:"fixed", inset:0, background:"#e8f4ff", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", zIndex:9999 }}>
       <div style={{ position:"relative", display:"inline-block", marginBottom:24 }}>
-        <svg width="120" height="140" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="60" cy="105" rx="32" ry="38" fill="#29b6e8"/>
-          <circle cx="60" cy="58" r="38" fill="#29b6e8"/>
-          <ellipse cx="22" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(-15 22 52)"/>
-          <ellipse cx="98" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(15 98 52)"/>
-          <circle cx="44" cy="55" r="10" fill="white"/>
-          <circle cx="76" cy="55" r="10" fill="white"/>
-          <circle cx="44" cy="57" r="6" fill="#1a1a2e"/>
-          <circle cx="76" cy="57" r="6" fill="#1a1a2e"/>
-          <circle cx="46" cy="55" r="2" fill="white"/>
-          <circle cx="78" cy="55" r="2" fill="white"/>
-          <ellipse cx="60" cy="68" rx="5" ry="4" fill="#f8a4c8"/>
-          <path d="M52 74 Q60 80 68 74" stroke="#1a1a2e" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-          <circle cx="50" cy="30" r="4" fill="#8dd44a"/>
-          <circle cx="60" cy="24" r="4" fill="#8dd44a"/>
-          <circle cx="70" cy="30" r="4" fill="#8dd44a"/>
-          <circle cx="18" cy="100" r="10" fill="#ffd44a"/>
-          <circle cx="18" cy="100" r="5" fill="#f8a4c8"/>
-          <circle cx="102" cy="100" r="10" fill="#ffd44a"/>
-          <circle cx="102" cy="100" r="5" fill="#f8a4c8"/>
-          <text x="60" y="115" textAnchor="middle" fill="#f8a4c8" fontSize="14" fontWeight="bold" fontFamily="sans-serif">AOI</text>
-        </svg>
-        <div style={{ position:"absolute", top:-16, left:"50%", transform:"translateX(-50%)" }}>
-          <svg width="36" height="36" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="15" fill="none" stroke="#c8e8ff" strokeWidth="3"/>
-            <circle cx="18" cy="18" r="15" fill="none" stroke="#29b6e8" strokeWidth="3"
-              strokeDasharray="60 36" strokeLinecap="round"
-              style={{ transformOrigin:"18px 18px", animation:"aoiSpin 1s linear infinite" }}/>
+        {imgOk ? (
+          <img src={AOI_IMG_URL} alt="AOI" onError={()=>setImgOk(false)}
+            style={{ width:140, height:170, objectFit:"contain", display:"block" }} />
+        ) : (
+          <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+            <ellipse cx="60" cy="105" rx="32" ry="38" fill="#29b6e8"/>
+            <circle cx="60" cy="58" r="38" fill="#29b6e8"/>
+            <ellipse cx="22" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(-15 22 52)"/>
+            <ellipse cx="98" cy="52" rx="14" ry="22" fill="#8dd44a" transform="rotate(15 98 52)"/>
+            <circle cx="44" cy="55" r="10" fill="white"/><circle cx="76" cy="55" r="10" fill="white"/>
+            <circle cx="44" cy="57" r="6" fill="#1a1a2e"/><circle cx="76" cy="57" r="6" fill="#1a1a2e"/>
+            <circle cx="46" cy="55" r="2" fill="white"/><circle cx="78" cy="55" r="2" fill="white"/>
+            <ellipse cx="60" cy="68" rx="5" ry="4" fill="#f8a4c8"/>
+            <path d="M52 74 Q60 80 68 74" stroke="#1a1a2e" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+            <circle cx="18" cy="100" r="10" fill="#ffd44a"/><circle cx="18" cy="100" r="5" fill="#f8a4c8"/>
+            <circle cx="102" cy="100" r="10" fill="#ffd44a"/><circle cx="102" cy="100" r="5" fill="#f8a4c8"/>
+            <text x="60" y="115" textAnchor="middle" fill="#f8a4c8" fontSize="14" fontWeight="bold" fontFamily="sans-serif">AOI</text>
+          </svg>
+        )}
+        {/* くるくる（キャラクターの上に重ねる） */}
+        <div style={{ position:"absolute", top:-20, left:"50%", transform:"translateX(-50%)" }}>
+          <svg width="44" height="44" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#c8e8ff" strokeWidth="4"/>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="#29b6e8" strokeWidth="4"
+              strokeDasharray="72 40" strokeLinecap="round"
+              style={{ transformOrigin:"22px 22px", animation:"aoiSpin 1s linear infinite" }}/>
           </svg>
         </div>
       </div>
@@ -272,7 +368,7 @@ function AuthPage({ onLogin, C, S }) {
         ) : (
           <>
             <div style={{ fontFamily:FB, fontSize:12, color:C.accent, background:C.accentBg, borderRadius:8, padding:"10px 14px", marginBottom:18, lineHeight:1.6 }}>
-              💡 意見は必ず<strong>匿名</strong>で他の生徒に表示されます。
+              意見は必ず<strong>匿名</strong>で他の生徒に表示されます。
             </div>
             <div style={{ marginBottom:12 }}>
               <label style={S.lbl}>メールアドレス <span style={{ color:C.danger }}>*</span></label>
@@ -306,7 +402,7 @@ function AuthPage({ onLogin, C, S }) {
 /* ============================================================
    設定ページ（アコーディオン式）
    ============================================================ */
-function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, C, S }) {
+function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, onShowTerms, C, S }) {
   const [open, setOpen]     = useState(null); // "profile" | "password" | "appearance"
   const [displayName, setDisplayName] = useState(user.displayName || "");
   const [grade, setGrade]   = useState(user.grade || "");
@@ -367,7 +463,7 @@ function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, C,
           {open === "profile" && sec.key === "profile" && (
             <div style={{ marginTop:20 }}>
               <div style={{ fontFamily:FB, fontSize:12, color:C.accent, background:C.accentBg, borderRadius:8, padding:"10px 14px", marginBottom:16, lineHeight:1.6 }}>
-                💡 意見は必ず<strong>匿名</strong>で表示されます。
+                意見は必ず<strong>匿名</strong>で表示されます。
               </div>
               <div style={{ marginBottom:12 }}><label style={S.lbl}>表示名 <span style={{ color:C.danger }}>*</span></label><input style={S.inp} value={displayName} onChange={e=>setDisplayName(e.target.value)} maxLength={20} /></div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:16 }}>
@@ -406,6 +502,10 @@ function SettingsPage({ user, onUpdateUser, onLogout, darkMode, onToggleDark, C,
         </div>
       ))}
 
+      <div style={S.card}>
+        <div style={S.divider}><h2 style={S.hdg(15)}>規約・ポリシー</h2></div>
+        <button onClick={onShowTerms} style={{ ...S.btnO, ...S.btnSm, marginBottom:12 }}>利用規約・プライバシーポリシーを見る</button>
+      </div>
       <div style={S.card}>
         <button onClick={onLogout} style={{ ...S.btnO, ...S.btnSm, color:C.danger, borderColor:"#f9a8c0" }}>ログアウト</button>
       </div>
@@ -578,9 +678,8 @@ function OpinionsPage({ opinions, isAdmin, onToggleAdopt, onSetProgress, onSetPc
 
                   {/* 進捗バー */}
                   <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.rule}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                    <div style={{ marginBottom:6 }}>
                       <span style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.inkMid }}>進捗状況</span>
-                      <span style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.accent }}>{item.pct??0}%</span>
                     </div>
                     {isAdmin ? (
                       <PctSlider row={item.row} pct={item.pct??0} progress={item.progress||"未着手"} onSetPct={onSetPct} onSetProgress={onSetProgress} C={C} />
@@ -871,9 +970,9 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
   const now = new Date();
 
   // アンケートを分類
-  const activeSurveys   = surveys.filter(sv => !sv.myAnswer && (!sv.deadline || new Date(sv.deadline) >= now));
+  const activeSurveys   = surveys.filter(sv => !sv.myAnswer && !isPastDeadline(sv.deadline));
   const answeredSurveys = surveys.filter(sv => sv.myAnswer);
-  const pastSurveys     = surveys.filter(sv => !sv.myAnswer && sv.deadline && new Date(sv.deadline) < now);
+  const pastSurveys     = surveys.filter(sv => !sv.myAnswer && isPastDeadline(sv.deadline));
 
   const addQuestion = () => setQuestions(qs=>[...qs,{ type:"choice", text:"", options:["",""], scaleMin:1, scaleMax:10, scaleMinLabel:"", scaleMaxLabel:"" }]);
   const removeQuestion = (i) => setQuestions(qs=>qs.filter((_,idx)=>idx!==i));
@@ -888,7 +987,7 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
       if (!q.text.trim()) { alert("質問文を全て入力してください"); return; }
       if (q.type==="choice" && q.options.some(o=>!o.trim())) { alert("選択肢を全て入力してください"); return; }
     }
-    onAddSurvey({ title:title.trim(), desc:desc.trim(), deadline:deadline||null, questions });
+    onAddSurvey({ title:title.trim(), desc:desc.trim(), deadline:deadline?toDeadlineISO(deadline):null, questions });
     setTitle(""); setDesc(""); setDeadline("");
     setQuestions([{ type:"choice", text:"", options:["",""], scaleMin:1, scaleMax:10, scaleMinLabel:"", scaleMaxLabel:"" }]);
     setCreating(false);
@@ -920,8 +1019,8 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
 
   const renderSurveyCard = (sv) => {
     const isOpen = openSv===sv.id;
-    const isPast = sv.deadline && new Date(sv.deadline) < now;
-    const canEdit = sv.myAnswer && sv.deadline && new Date(sv.deadline) >= now;
+    const isPast = isPastDeadline(sv.deadline);
+    const canEdit = sv.myAnswer && sv.deadline && !isPastDeadline(sv.deadline);
 
     return (
       <div key={sv.id} style={{ border:`1px solid ${C.rule}`, borderRadius:12, marginBottom:12, overflow:"hidden" }}>
@@ -931,12 +1030,13 @@ function SurveyPage({ surveys, isAdmin, onAddSurvey, onAnswerSurvey, onDeleteSur
             <div style={{ fontFamily:FS, fontSize:15, fontWeight:600, color:C.ink }}>{sv.title}</div>
             {sv.desc && <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid, marginTop:3 }}>{sv.desc}</div>}
             <div style={{ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }}>
-              {sv.deadline && <span style={{ fontFamily:FB, fontSize:11, color:isPast?C.danger:C.amber, background:isPast?C.dangerBg:C.amberBg, padding:"2px 8px", borderRadius:100 }}>締切：{sv.deadline}</span>}
+              {sv.deadline && <span style={{ fontFamily:FB, fontSize:11, color:isPastDeadline(sv.deadline)?C.danger:C.amber, background:isPastDeadline(sv.deadline)?C.dangerBg:C.amberBg, padding:"2px 8px", borderRadius:100 }}>締切：{formatDeadline(sv.deadline)}</span>}
               {sv.myAnswer && <span style={{ fontFamily:FB, fontSize:11, color:C.green, background:C.greenBg, padding:"2px 8px", borderRadius:100 }}>✓ 回答済み</span>}
               {canEdit && <span style={{ fontFamily:FB, fontSize:11, color:C.accent, background:C.accentBg, padding:"2px 8px", borderRadius:100 }}>変更可</span>}
             </div>
           </div>
           <div style={{ display:"flex", gap:6, alignItems:"center", flexShrink:0 }}>
+            <span style={{ fontFamily:FB, fontSize:11, color:C.inkLight }}>{sv.totalVotes||0}票</span>
             {isAdmin && <button onClick={e=>{e.stopPropagation();setConfirmDel(sv.id);}} style={{ fontFamily:FB, background:C.dangerBg, border:`1px solid #f9a8c0`, color:C.danger, fontSize:11, padding:"3px 8px", borderRadius:6, fontWeight:700, cursor:"pointer" }}>削除</button>}
             <span style={{ color:C.inkLight, fontSize:16, transition:"transform .2s", transform:isOpen?"rotate(180deg)":"rotate(0)" }}>▾</span>
           </div>
@@ -1126,8 +1226,110 @@ function NavIcon({ type, active, color }) {
   return <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>{icons[type]}</span>;
 }
 
+
+/* ============================================================
+   利用規約モーダル
+   ============================================================ */
+function TermsModal({ onAgree, C, S }) {
+  const [tab, setTab] = useState("terms");
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:9000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div style={{ background:C.paper, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 24px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ padding:"20px 24px 12px", borderBottom:`1px solid ${C.rule}` }}>
+          <div style={{ fontFamily:FS, fontWeight:600, fontSize:17, color:C.ink, marginBottom:12 }}>ご利用前にお読みください</div>
+          <div style={{ display:"flex", gap:8 }}>
+            {["terms","privacy"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)}
+                style={{ fontFamily:FB, fontSize:12, fontWeight:700, padding:"6px 14px", borderRadius:8, border:`1px solid ${tab===t?C.accent:C.rule}`, background:tab===t?C.accentBg:C.paper, color:tab===t?C.accent:C.inkMid, cursor:"pointer" }}>
+                {t==="terms"?"利用規約":"プライバシーポリシー"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"16px 24px" }}>
+          <pre style={{ fontFamily:FB, fontSize:12, color:C.inkMid, lineHeight:1.8, whiteSpace:"pre-wrap", margin:0 }}>{tab==="terms"?TERMS:PRIVACY}</pre>
+        </div>
+        <div style={{ padding:"16px 24px", borderTop:`1px solid ${C.rule}` }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+            <input type="checkbox" id="agreeCheck" checked={agreed} onChange={e=>setAgreed(e.target.checked)} style={{ width:18, height:18, accentColor:C.accent, cursor:"pointer" }} />
+            <label htmlFor="agreeCheck" style={{ fontFamily:FB, fontSize:13, color:C.ink, cursor:"pointer" }}>利用規約とプライバシーポリシーに同意します</label>
+          </div>
+          <button onClick={()=>agreed&&onAgree()} disabled={!agreed}
+            style={{ ...S.btnP, width:"100%", justifyContent:"center", opacity:agreed?1:0.5, cursor:agreed?"pointer":"not-allowed" }}>
+            同意してはじめる
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── 利用規約閲覧モーダル（設定から） ── */
+function TermsViewModal({ onClose, C, S }) {
+  const [tab, setTab] = useState("terms");
+  return (
+    <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:8000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:C.paper, borderRadius:16, width:"100%", maxWidth:520, maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 24px 48px rgba(0,0,0,0.3)" }}>
+        <div style={{ padding:"20px 24px 12px", borderBottom:`1px solid ${C.rule}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ display:"flex", gap:8 }}>
+            {["terms","privacy"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)}
+                style={{ fontFamily:FB, fontSize:12, fontWeight:700, padding:"6px 14px", borderRadius:8, border:`1px solid ${tab===t?C.accent:C.rule}`, background:tab===t?C.accentBg:C.paper, color:tab===t?C.accent:C.inkMid, cursor:"pointer" }}>
+                {t==="terms"?"利用規約":"プライバシーポリシー"}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:C.inkLight, padding:4 }}>✕</button>
+        </div>
+        <div style={{ flex:1, overflowY:"auto", padding:"16px 24px" }}>
+          <pre style={{ fontFamily:FB, fontSize:12, color:C.inkMid, lineHeight:1.8, whiteSpace:"pre-wrap", margin:0 }}>{tab==="terms"?TERMS:PRIVACY}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   通知センター
+   ============================================================ */
+function NotificationCenter({ notifications, onClear, onNavigate, onClose, C, S }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      <div style={S.card}>
+        <div style={{ ...S.divider, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <h1 style={S.hdg(17)}><span style={S.dot}/>通知センター</h1>
+          {notifications.length>0 && (
+            <button onClick={onClear} style={{ fontFamily:FB, fontSize:12, color:C.inkLight, background:"none", border:"none", cursor:"pointer", textDecoration:"underline" }}>すべて既読にする</button>
+          )}
+        </div>
+        {notifications.length===0 ? (
+          <div style={{ fontFamily:FB, textAlign:"center", padding:"40px 0", color:C.inkLight, fontSize:13 }}>通知はありません</div>
+        ) : notifications.map(n=>(
+          <div key={n.id} onClick={()=>onNavigate(n)}
+            style={{ display:"flex", gap:12, alignItems:"flex-start", padding:"14px 12px", borderRadius:10, marginBottom:8, cursor:"pointer", background:n.read?C.wash:C.accentBg, border:`1px solid ${n.read?C.rule:C.accent+"40"}`, transition:"background .15s" }}>
+            <div style={{ width:40, height:40, borderRadius:10, background:n.type==="survey"?C.accent:C.green, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              {n.type==="survey" ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h3l2 3 2-3h9a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg>
+              )}
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:FB, fontSize:13, fontWeight:700, color:C.ink, marginBottom:2 }}>{n.title}</div>
+              <div style={{ fontFamily:FB, fontSize:12, color:C.inkMid, lineHeight:1.5 }}>{n.body}</div>
+              <div style={{ fontFamily:FB, fontSize:11, color:C.inkLight, marginTop:4 }}>{n.time}</div>
+            </div>
+            {!n.read && <div style={{ width:8, height:8, borderRadius:"50%", background:C.accent, flexShrink:0, marginTop:4 }}/>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── ボトムナビ ── */
-function BottomNav({ page, setPage, unreadCount, onClearUnread, C }) {
+function BottomNav({ page, setPage, unreadCount, C }) {
   const tabs = [
     { id:"send",     icon:"send",     label:"意見を送る" },
     { id:"opinions", icon:"opinions", label:"みんなの声" },
@@ -1139,7 +1341,7 @@ function BottomNav({ page, setPage, unreadCount, onClearUnread, C }) {
   return (
     <nav style={{ position:"fixed", bottom:0, left:0, right:0, background:C.navBg, borderTop:`1px solid ${C.rule}`, zIndex:300, display:"flex", alignItems:"stretch" }}>
       {tabs.map(t=>(
-        <button key={t.id} onClick={()=>{ setPage(t.id); if(t.id==="survey") onClearUnread(); }} style={{ ...btnStyle(page===t.id), position:"relative" }}>
+        <button key={t.id} onClick={()=>setPage(t.id)} style={{ ...btnStyle(page===t.id), position:"relative" }}>
           <NavIcon type={t.icon} active={page===t.id} color={page===t.id?C.accent:C.inkLight} />
           {t.label}
           {t.id==="survey" && unreadCount>0 && (
@@ -1188,6 +1390,8 @@ export default function App() {
 
   const [user, setUser]           = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showTermsView, setShowTermsView] = useState(false);
   const [page, setPageRaw]        = useState("send");
   const setPage = (p) => { setPageRaw(p); window.scrollTo({top:0,behavior:"instant"}); };
   const [opinions, setOpinions]   = useState([]);
@@ -1195,18 +1399,40 @@ export default function App() {
   const [surveys, setSurveys]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [notifSurvey, setNotifSurvey] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]); // 通知センター
   const [toast, setToast]         = useState("");
   const toastTimer                = useRef(null);
   const isMobile                  = useWidth() < 720;
-  let nextEvId                    = useRef(1);
+  const prevOpinionsRef           = useRef([]);
+  const prevSurveysRef            = useRef([]);
 
   const isAdmin = user?.email === ADMIN_EMAIL;
+  const unreadCount = notifications.filter(n=>!n.read).length;
+
+  /* ── 通知を追加するヘルパー ── */
+  const addNotification = (notif) => {
+    setNotifications(prev => {
+      const next = [{ ...notif, id:Date.now()+Math.random(), time:new Date().toLocaleString("ja-JP"), read:false }, ...prev];
+      if (user) localStorage.setItem(`notifications_${user.email}`, JSON.stringify(next));
+      return next;
+    });
+  };
 
   // localStorageからログイン状態復元
   useEffect(() => {
     const saved = localStorage.getItem("authUser");
-    if (saved) { try { setUser(JSON.parse(saved)); } catch(e){} }
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        setUser(u);
+        // 通知を復元
+        const savedNotifs = localStorage.getItem(`notifications_${u.email}`);
+        if (savedNotifs) setNotifications(JSON.parse(savedNotifs));
+        // 初回同意チェック
+        const agreed = localStorage.getItem(`termsAgreed_${u.email}`);
+        if (!agreed) setShowTerms(true);
+      } catch(e){}
+    }
     setAuthChecked(true);
   }, []);
 
@@ -1216,36 +1442,117 @@ export default function App() {
     setLoading(true);
     Promise.all([gasGet("getOpinions"), gasGet("getEvents"), gasGet("getSurveys")])
       .then(([ops,evs,svs]) => {
-        setOpinions(Array.isArray(ops)?ops:[]);
+        const opList = Array.isArray(ops)?ops:[];
+        setOpinions(opList);
+        prevOpinionsRef.current = opList;
         setEvents(Array.isArray(evs)?evs.sort((a,b)=>a.date.localeCompare(b.date)):[]);
-        // 回答済み状態をlocalStorageから復元（アンケートごとに独立）
         const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers")||"{}");
-        setSurveys((Array.isArray(svs)?svs:[]).map(sv=>({ ...sv, myAnswer:savedAnswers[sv.id]||null })));
+        const seenSurveys = JSON.parse(localStorage.getItem(`seenSurveys_${user.email}`)||"[]");
+        const svList = (Array.isArray(svs)?svs:[]).map(sv=>({ ...sv, myAnswer:savedAnswers[sv.id]||null, totalVotes:calcTotalVotes(sv) }));
+        setSurveys(svList);
+        prevSurveysRef.current = svList;
       })
       .catch(()=>{})
       .finally(()=>setLoading(false));
   }, [user]);
 
-  // みんなの声 自動更新（30秒ごと）
+  // 自動更新（10秒ごと）
   useEffect(() => {
     if (!user || !USE_GAS) return;
     const interval = setInterval(async () => {
       try {
-        const ops = await gasGet("getOpinions");
-        if (Array.isArray(ops)) setOpinions(ops);
+        const [ops, svs] = await Promise.all([gasGet("getOpinions"), gasGet("getSurveys")]);
+
+        // みんなの声更新 + 自分の意見への返信通知
+        if (Array.isArray(ops)) {
+          const prev = prevOpinionsRef.current;
+          ops.forEach(op => {
+            if (op.authorEmail === user.email && op.reply) {
+              const prevOp = prev.find(p=>p.row===op.row);
+              if (!prevOp || !prevOp.reply) {
+                addNotification({ type:"reply", title:"生徒会から返信が届きました", body:`「${op.name||"タイトルなし"}」への返信が届きました`, targetPage:"opinions" });
+              }
+            }
+          });
+          setOpinions(ops);
+          prevOpinionsRef.current = ops;
+        }
+
+        // アンケート更新 + 新アンケート通知
+        if (Array.isArray(svs)) {
+          const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers")||"{}");
+          const seenSurveys = JSON.parse(localStorage.getItem(`seenSurveys_${user.email}`)||"[]");
+          const svList = svs.map(sv=>({ ...sv, myAnswer:savedAnswers[sv.id]||null, totalVotes:calcTotalVotes(sv) }));
+
+          // 新しいアンケートを検出して通知
+          svList.forEach(sv => {
+            if (!seenSurveys.includes(sv.id) && !isPastDeadline(sv.deadline)) {
+              addNotification({ type:"survey", title:"新しいアンケートが公開されました", body:sv.title, targetPage:"survey", targetId:sv.id });
+              setNotifSurvey(sv);
+              // 既読済みとして記録
+              const updated = [...seenSurveys, sv.id];
+              localStorage.setItem(`seenSurveys_${user.email}`, JSON.stringify(updated));
+            }
+          });
+
+          setSurveys(svList);
+          prevSurveysRef.current = svList;
+        }
       } catch(e) {}
-    }, 30000);
+    }, 10000);
     return () => clearInterval(interval);
   }, [user]);
+
+  /* ── 投票数計算ヘルパー ── */
+  const calcTotalVotes = (sv) => {
+    if (!sv.questionAnswers || !sv.questionAnswers[0]) return 0;
+    const first = sv.questionAnswers[0];
+    if (Array.isArray(first) && first[0]?.count !== undefined) {
+      return first.reduce((s,a)=>s+(a.count||0),0);
+    }
+    if (Array.isArray(first)) return first.length;
+    return 0;
+  };
 
   const showToast = msg => {
     setToast(msg); clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(()=>setToast(""),3000);
   };
 
-  const handleLogin   = (u) => { setUser(u); showToast("ログインしました"); };
-  const handleLogout  = () => { localStorage.removeItem("authUser"); setUser(null); setOpinions([]); setEvents([]); setSurveys([]); showToast("ログアウトしました"); };
+  const handleLogin = (u) => {
+    setUser(u);
+    const savedNotifs = localStorage.getItem(`notifications_${u.email}`);
+    if (savedNotifs) try { setNotifications(JSON.parse(savedNotifs)); } catch(e){}
+    const agreed = localStorage.getItem(`termsAgreed_${u.email}`);
+    if (!agreed) setShowTerms(true);
+    showToast("ログインしました");
+  };
+  const handleLogout = () => {
+    localStorage.removeItem("authUser");
+    setUser(null); setOpinions([]); setEvents([]); setSurveys([]); setNotifications([]);
+    showToast("ログアウトしました");
+  };
   const handleUpdateUser = (u) => { setUser(u); showToast("プロフィールを更新しました"); };
+  const handleTermsAgree = () => {
+    localStorage.setItem(`termsAgreed_${user.email}`, "true");
+    setShowTerms(false);
+  };
+  const handleNotifNavigate = (n) => {
+    // 通知を既読に
+    setNotifications(prev => {
+      const next = prev.map(x=>x.id===n.id?{...x,read:true}:x);
+      localStorage.setItem(`notifications_${user.email}`, JSON.stringify(next));
+      return next;
+    });
+    setPage(n.targetPage||"survey");
+  };
+  const handleClearNotifs = () => {
+    setNotifications(prev => {
+      const next = prev.map(x=>({...x,read:true}));
+      localStorage.setItem(`notifications_${user.email}`, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const handleSubmit = async ({ name, message }) => {
     if (USE_GAS) {
@@ -1295,10 +1602,12 @@ export default function App() {
       await gasPost({ action:"addSurvey", ...sv });
       const svs = await gasGet("getSurveys");
       const savedAnswers = JSON.parse(localStorage.getItem("surveyAnswers")||"{}");
-      const loaded = (Array.isArray(svs)?svs:[]).map(s=>({...s,myAnswer:savedAnswers[s.id]||null}));
+      const seenSurveys = JSON.parse(localStorage.getItem(`seenSurveys_${user.email}`)||"[]");
+      const loaded = (Array.isArray(svs)?svs:[]).map(s=>({...s,myAnswer:savedAnswers[s.id]||null,totalVotes:calcTotalVotes(s)}));
       setSurveys(loaded);
-      const newSv = loaded[0];
-      if (newSv) { setNotifSurvey(newSv); setUnreadCount(c=>c+1); }
+      // 作成したアンケートはseenに追加（自分には通知しない）
+      const newIds = loaded.map(s=>s.id);
+      localStorage.setItem(`seenSurveys_${user.email}`, JSON.stringify([...new Set([...seenSurveys,...newIds])]));
     }
     showToast("アンケートを公開しました");
   };
@@ -1342,7 +1651,7 @@ export default function App() {
             {isAdmin && <span style={{ fontFamily:FB, fontSize:11, fontWeight:700, color:C.amber, background:C.amberBg, padding:"2px 8px", borderRadius:100 }}>管理者</span>}
           </div>
           {isMobile && (
-            <button onClick={()=>{ setPage("survey"); setUnreadCount(0); }} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", marginLeft:"auto" }}>
+            <button onClick={()=>setPage("notifications")} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", marginLeft:"auto" }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               {unreadCount>0 && <span style={{ position:"absolute", top:2, right:2, width:15, height:15, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:8, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>}
             </button>
@@ -1360,7 +1669,7 @@ export default function App() {
           )}
           {!isMobile && (
             <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <button onClick={()=>{ setPage("survey"); setUnreadCount(0); }} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+              <button onClick={()=>setPage("notifications")} style={{ position:"relative", background:"none", border:`1px solid ${C.rule}`, borderRadius:100, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.inkMid} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 {unreadCount>0 && <span style={{ position:"absolute", top:2, right:2, width:16, height:16, borderRadius:"50%", background:C.danger, color:"#fff", fontSize:9, fontWeight:700, fontFamily:FB, display:"flex", alignItems:"center", justifyContent:"center" }}>{unreadCount}</span>}
               </button>
@@ -1380,14 +1689,17 @@ export default function App() {
             {page==="opinions" && <OpinionsPage opinions={opinions} isAdmin={isAdmin} onToggleAdopt={handleToggleAdopt} onSetProgress={handleSetProgress} onSetPct={handleSetPct} onSetReply={handleSetReply} C={C} S={S} />}
             {page==="events"   && <EventsPage events={events} isAdmin={isAdmin} onAddEvent={handleAddEvent} onEditEvent={handleEditEvent} onDeleteEvent={handleDeleteEvent} C={C} S={S} />}
             {page==="survey"   && <SurveyPage surveys={surveys} isAdmin={isAdmin} onAddSurvey={handleAddSurvey} onAnswerSurvey={handleAnswerSurvey} onDeleteSurvey={handleDeleteSurvey} C={C} S={S} />}
-            {page==="settings" && <SettingsPage user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} darkMode={darkMode} onToggleDark={handleToggleDark} C={C} S={S} />}
+            {page==="settings" && <SettingsPage user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} darkMode={darkMode} onToggleDark={handleToggleDark} onShowTerms={()=>setShowTermsView(true)} C={C} S={S} />}
+            {page==="notifications" && <NotificationCenter notifications={notifications} onClear={handleClearNotifs} onNavigate={handleNotifNavigate} onClose={()=>setPage("send")} C={C} S={S} />}
           </>
         )}
       </main>
 
-      {isMobile && <BottomNav page={page} setPage={setPage} unreadCount={unreadCount} onClearUnread={()=>setUnreadCount(0)} C={C} />}
+      {isMobile && <BottomNav page={page} setPage={setPage} unreadCount={unreadCount} C={C} />}
       <Toast msg={toast} />
-      <NotifBanner survey={notifSurvey} onTap={()=>{ setPage("survey"); setUnreadCount(0); }} onDismiss={()=>setNotifSurvey(null)} C={C} />
+      {showTerms && user && <TermsModal onAgree={handleTermsAgree} C={C} S={S} />}
+      {showTermsView && <TermsViewModal onClose={()=>setShowTermsView(false)} C={C} S={S} />}
+      <NotifBanner survey={notifSurvey} onTap={()=>{ setPage("notifications"); setNotifSurvey(null); }} onDismiss={()=>setNotifSurvey(null)} C={C} />
     </div>
   );
 }
